@@ -75,6 +75,10 @@ const userSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     }
+  }],
+  routines: [{  // New field for routines
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Routine'
   }]
 }, {
   timestamps: true

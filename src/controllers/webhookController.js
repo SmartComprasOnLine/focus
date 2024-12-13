@@ -9,19 +9,18 @@ class WebhookController {
       console.log('Webhook payload:', JSON.stringify(req.body, null, 2));
       
       // Extrair informações do webhook da Evolution API
-      const { messages } = req.body;
-      if (!messages || !messages[0]) {
+      const { data } = req.body;
+      if (!data || !data.key || !data.message) {
         console.log('No message in webhook');
         return res.status(200).json({ message: 'No message in webhook' });
       }
 
-      const message = messages[0];
-      const whatsappNumber = message.key.remoteJid.replace('@s.whatsapp.net', '');
-      const messageContent = message.message?.conversation || 
-                           message.message?.extendedTextMessage?.text ||
+      const whatsappNumber = data.key.remoteJid.replace('@s.whatsapp.net', '');
+      const messageContent = data.message?.conversation || 
+                           data.message?.extendedTextMessage?.text ||
                            'Media message received';
-      const messageType = message.messageType || 'text';
-      const userName = message.pushName || 'Novo Usuário';
+      const messageType = data.messageType || 'text';
+      const userName = data.pushName || 'Novo Usuário';
 
       console.log('Processed message:', {
         whatsappNumber,
@@ -104,12 +103,15 @@ class WebhookController {
       console.log('Processing message by type:', messageType);
       switch (messageType) {
         case 'text':
+          console.log('Handling text message');
           await this.handleTextMessage(user, messageContent);
           break;
         case 'audio':
+          console.log('Handling audio message');
           await this.handleAudioMessage(user, messageContent);
           break;
         case 'image':
+          console.log('Handling image message');
           await this.handleImageMessage(user, messageContent);
           break;
         default:
@@ -164,6 +166,7 @@ class WebhookController {
       // Send response to user
       console.log('Sending response to user');
       await evolutionApi.sendText(user.whatsappNumber, coachResponse);
+      console.log('Response sent successfully');
 
       // Check if it's time to send trial ending reminder
       if (user.subscription.status === 'em_teste') {
@@ -178,6 +181,7 @@ class WebhookController {
             `⚠️ ${user.name}, seu período de teste termina amanhã! ` +
             'Para continuar tendo acesso a todas as funcionalidades, escolha um de nossos planos.'
           );
+          console.log('Trial ending reminder sent');
         }
       }
 

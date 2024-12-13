@@ -43,43 +43,46 @@ app.post('/webhook', async (req, res) => {
             messageContent = data.message.imageMessage.url || 'Image received';
         }
 
+        const requestBody = {
+            instance,
+            messages: [
+                {
+                    key: {
+                        remoteJid: data.key.remoteJid,
+                        fromMe: data.key.fromMe,
+                        id: data.key.id
+                    },
+                    pushName: data.pushName,
+                    message: {
+                        conversation: messageContent,
+                        messageTimestamp: data.messageTimestamp
+                    },
+                    messageType,
+                    metadata: {
+                        source: data.source,
+                        instanceId: data.instanceId
+                    }
+                }
+            ]
+        };
+
         console.log('Sending request to main service:', {
-            url: 'http://app:3001/api/webhook/whatsapp',
-            messageType,
-            messageContent,
-            remoteJid: data.key.remoteJid,
-            pushName: data.pushName
+            url: 'http://app:3001/api/webhook',
+            body: JSON.stringify(requestBody, null, 2)
         });
 
         // Encaminhar a requisição para o serviço principal
-        const response = await fetch('http://app:3001/api/webhook/whatsapp', {
+        const response = await fetch('http://app:3001/api/webhook', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                instance,
-                messages: [
-                    {
-                        key: {
-                            remoteJid: data.key.remoteJid,
-                            fromMe: data.key.fromMe,
-                            id: data.key.id
-                        },
-                        pushName: data.pushName,
-                        message: {
-                            conversation: messageContent,
-                            messageTimestamp: data.messageTimestamp
-                        },
-                        messageType,
-                        metadata: {
-                            source: data.source,
-                            instanceId: data.instanceId
-                        }
-                    }
-                ]
-            })
+            body: JSON.stringify(requestBody)
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
         const responseData = await response.json();
         console.log('=== RESPONSE FROM MAIN SERVICE ===');
@@ -89,7 +92,8 @@ app.post('/webhook', async (req, res) => {
         res.status(200).send('Webhook received and processed');
     } catch (error) {
         console.error('=== ERROR PROCESSING WEBHOOK ===');
-        console.error(error);
+        console.error('Error details:', error);
+        console.error('Stack trace:', error.stack);
         console.error('=== ERROR END ===');
         res.status(500).send('Error processing webhook');
     }

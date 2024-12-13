@@ -5,7 +5,7 @@ const subscriptionController = require('../controllers/subscriptionController');
 const router = express.Router();
 
 // Webhook routes
-router.post('/webhook/whatsapp', webhookController.handleWebhook.bind(webhookController));
+router.post('/webhook', webhookController.handleWebhook.bind(webhookController));
 
 // Subscription routes
 router.post('/subscription/create-checkout', subscriptionController.createCheckoutSession.bind(subscriptionController));

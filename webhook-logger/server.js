@@ -2,7 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const fetch = require('node-fetch');
 const app = express();
-const PORT = 80;
+const PORT = process.env.PORT || 4000;
 
 app.use(bodyParser.json());
 
@@ -43,8 +43,16 @@ app.post('/webhook', async (req, res) => {
             messageContent = data.message.imageMessage.url || 'Image received';
         }
 
+        console.log('Sending request to main service:', {
+            url: 'http://app:3001/api/webhook/whatsapp',
+            messageType,
+            messageContent,
+            remoteJid: data.key.remoteJid,
+            pushName: data.pushName
+        });
+
         // Encaminhar a requisição para o serviço principal
-        const response = await fetch('http://app:3000/api/webhook/whatsapp', {
+        const response = await fetch('http://app:3001/api/webhook/whatsapp', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

@@ -22,5 +22,14 @@ services:
     volumes:
       - mongodb_data:/data/db
 
+  webhook-logger:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./webhook-logger:/app
+    command: ["node", "server.js"]
+    ports:
+      - "4000:4000"  # Expondo a porta 4000 para acesso ao logger
+
 volumes:
   mongodb_data:

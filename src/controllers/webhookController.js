@@ -8,7 +8,10 @@ class WebhookController {
       console.log('=== WEBHOOK REQUEST START ===');
       console.log('Webhook payload:', JSON.stringify(req.body, null, 2));
       
-      // Extrair informações do webhook da Evolution API
+      // Log the incoming request body for debugging
+      console.log('Incoming request body:', JSON.stringify(req.body, null, 2));
+      
+      // Extract information from the webhook from Evolution API
       const { data } = req.body;
       if (!data || !data.key || !data.message) {
         console.log('No message in webhook');
@@ -93,11 +96,15 @@ class WebhookController {
 
       // Store interaction in history with role
       console.log('Storing interaction in history');
-      user.interactionHistory.push({
-        type: messageType,
-        content: messageContent,
-        role: 'user'  // Adicionado o campo role
-      });
+      if (messageType && messageContent) {
+        user.interactionHistory.push({
+          type: messageType,
+          content: messageContent,
+          role: 'user'  // Set role for user interactions
+        });
+      } else {
+        console.error('Failed to store interaction: Missing type or content');
+      }
 
       // Process message based on type
       console.log('Processing message by type:', messageType);
@@ -125,8 +132,12 @@ class WebhookController {
       return res.status(200).json({ message: 'Message processed successfully' });
 
     } catch (error) {
-      console.error('=== ERROR PROCESSING WEBHOOK ===');
-      console.error('Error details:', error);
+      console.error('=== ERROR PROCESSING WEBHOOK ===', {
+        message: error.message,
+        requestBody: JSON.stringify(req.body, null, 2),
+        user: user ? { whatsappNumber: user.whatsappNumber, name: user.name } : null
+      });
+      console.error('Error details:', error); // Log the error details
       console.error('Stack trace:', error.stack);
       console.error('=== ERROR END ===');
       return res.status(500).json({ error: 'Internal server error' });
@@ -158,7 +169,7 @@ class WebhookController {
       user.interactionHistory.push({
         type: 'text',
         content: coachResponse,
-        role: 'assistant'  // Adicionado o campo role
+        role: 'assistant'  // Set role for AI responses
       });
 
       // Send response to user

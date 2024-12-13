@@ -118,7 +118,9 @@ class WebhookController {
         );
       }
 
+      console.log('Current interaction history:', user.interactionHistory);
       await user.save();
+      console.log('User saved successfully with updated interaction history.');
       console.log('=== WEBHOOK REQUEST END ===');
       return res.status(200).json({ message: 'Message processed successfully' });
 

@@ -15,11 +15,25 @@ class EvolutionApiService {
     });
   }
 
+  // Função auxiliar para calcular o delay baseado no tamanho do texto
+  calculateDelay(text) {
+    // Média de digitação: 40 palavras por minuto = ~200 caracteres por minuto
+    // Isso significa ~3.33 caracteres por segundo
+    const charactersPerSecond = 3.33;
+    const minDelay = 2000; // Delay mínimo de 2 segundos
+    const maxDelay = 8000; // Delay máximo de 8 segundos
+    
+    const delay = Math.ceil(text.length / charactersPerSecond) * 1000;
+    return Math.min(Math.max(delay, minDelay), maxDelay);
+  }
+
   async sendText(number, text) {
     try {
+      const delay = this.calculateDelay(text);
       const response = await this.axiosInstance.post(`/message/sendText/${this.instance}`, {
         number,
-        text
+        text,
+        delay
       });
       return response.data;
     } catch (error) {
@@ -30,12 +44,14 @@ class EvolutionApiService {
 
   async sendMedia(number, mediatype, mimetype, caption, mediaUrl) {
     try {
+      const delay = caption ? this.calculateDelay(caption) : 3000;
       const response = await this.axiosInstance.post(`/message/sendMedia/${this.instance}`, {
         number,
         mediatype,
         mimetype,
         caption,
-        media: mediaUrl
+        media: mediaUrl,
+        delay
       });
       return response.data;
     } catch (error) {
@@ -48,7 +64,8 @@ class EvolutionApiService {
     try {
       const response = await this.axiosInstance.post(`/message/sendWhatsAppAudio/${this.instance}`, {
         number,
-        audio: audioUrl
+        audio: audioUrl,
+        delay: 2000 // Delay fixo para áudio
       });
       return response.data;
     } catch (error) {
@@ -59,12 +76,17 @@ class EvolutionApiService {
 
   async sendList(number, title, description, buttonText, sections) {
     try {
+      // Calcula o delay baseado no título e descrição combinados
+      const combinedText = `${title} ${description}`;
+      const delay = this.calculateDelay(combinedText);
+      
       const response = await this.axiosInstance.post(`/message/sendList/${this.instance}`, {
         number,
         title,
         description,
         buttonText,
-        sections
+        sections,
+        delay
       });
       return response.data;
     } catch (error) {

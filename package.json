@@ -1,13 +1,20 @@
 {
-  "name": "webhook-logger",
+  "name": "focus",
   "version": "1.0.0",
-  "description": "A webhook logger application",
-  "main": "server.js",
+  "description": "TDAH Coach Assistant",
+  "main": "src/app.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node src/app.js"
   },
   "dependencies": {
+    "axios": "^1.6.2",
     "body-parser": "^1.20.3",
-    "express": "^4.21.2"
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.21.2",
+    "helmet": "^7.1.0",
+    "mongoose": "^8.0.3",
+    "morgan": "^1.10.0",
+    "openai": "^4.24.0"
   }
 }

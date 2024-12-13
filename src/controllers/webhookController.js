@@ -19,7 +19,7 @@ class WebhookController {
       const messageContent = data.message?.conversation || 
                            data.message?.extendedTextMessage?.text ||
                            'Media message received';
-      const messageType = data.messageType || 'text';
+      const messageType = data.messageType === 'conversation' ? 'text' : data.messageType || 'text';
       const userName = data.pushName || 'Novo Usuário';
 
       console.log('Processed message:', {
@@ -101,25 +101,21 @@ class WebhookController {
 
       // Process message based on type
       console.log('Processing message by type:', messageType);
-      switch (messageType) {
-        case 'text':
-          console.log('Handling text message');
-          await this.handleTextMessage(user, messageContent);
-          break;
-        case 'audio':
-          console.log('Handling audio message');
-          await this.handleAudioMessage(user, messageContent);
-          break;
-        case 'image':
-          console.log('Handling image message');
-          await this.handleImageMessage(user, messageContent);
-          break;
-        default:
-          console.log('Unknown message type, sending default response');
-          await evolutionApi.sendText(
-            whatsappNumber,
-            '🤔 Desculpe, ainda não sei processar esse tipo de mensagem.'
-          );
+      if (messageType === 'text') {
+        console.log('Handling text message');
+        await this.handleTextMessage(user, messageContent);
+      } else if (messageType === 'audio') {
+        console.log('Handling audio message');
+        await this.handleAudioMessage(user, messageContent);
+      } else if (messageType === 'image') {
+        console.log('Handling image message');
+        await this.handleImageMessage(user, messageContent);
+      } else {
+        console.log('Unknown message type, sending default response');
+        await evolutionApi.sendText(
+          whatsappNumber,
+          '🤔 Desculpe, ainda não sei processar esse tipo de mensagem.'
+        );
       }
 
       await user.save();

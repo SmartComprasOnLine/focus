@@ -91,12 +91,12 @@ class WebhookController {
         return res.status(200).json({ message: 'Subscription required message sent' });
       }
 
-      // Store interaction in history
+      // Store interaction in history with role
       console.log('Storing interaction in history');
       user.interactionHistory.push({
         type: messageType,
         content: messageContent,
-        role: 'user'
+        role: 'user'  // Adicionado o campo role
       });
 
       // Process message based on type
@@ -151,12 +151,12 @@ class WebhookController {
 
       console.log('AI response generated:', coachResponse);
 
-      // Store AI response in history
+      // Store AI response in history with role
       console.log('Storing AI response in history');
       user.interactionHistory.push({
         type: 'text',
         content: coachResponse,
-        role: 'assistant'
+        role: 'assistant'  // Adicionado o campo role
       });
 
       // Send response to user

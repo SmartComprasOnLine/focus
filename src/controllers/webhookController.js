@@ -18,9 +18,15 @@ class WebhookController {
       const messageContent = message.message?.conversation || 
                            message.message?.extendedTextMessage?.text ||
                            'Media message received';
-      const messageType = message.message?.conversation ? 'text' : 
-                         message.message?.audioMessage ? 'audio' :
-                         message.message?.imageMessage ? 'image' : 'unknown';
+      const messageType = message.messageType || 'text';
+      const userName = message.pushName || 'Novo Usuário';
+
+      console.log('Processed message:', {
+        whatsappNumber,
+        messageContent,
+        messageType,
+        userName
+      });
 
       // Find or create user
       let user = await User.findOne({ whatsappNumber });
@@ -29,7 +35,7 @@ class WebhookController {
         // New user - start trial
         user = await User.create({
           whatsappNumber,
-          name: 'Novo Usuário', // Will be updated later
+          name: userName,
           subscription: {
             status: 'em_teste',
             trialStartDate: new Date(),
@@ -40,7 +46,7 @@ class WebhookController {
         // Send welcome message
         await evolutionApi.sendText(
           whatsappNumber,
-          '👋 Olá! Bem-vindo ao seu assistente pessoal para TDAH!\n\n' +
+          `👋 Olá ${userName}! Bem-vindo ao seu assistente pessoal para TDAH!\n\n` +
           'Estou aqui para ajudar você a organizar sua rotina e melhorar seu foco. ' +
           'Você tem 7 dias de teste gratuito para experimentar todas as funcionalidades.\n\n' +
           'Como posso ajudar você hoje?'
@@ -49,11 +55,16 @@ class WebhookController {
         return res.status(200).json({ message: 'Welcome message sent' });
       }
 
+      // Update user name if different
+      if (user.name !== userName && userName !== 'Novo Usuário') {
+        user.name = userName;
+      }
+
       // Check access
       if (!user.hasAccess()) {
         await evolutionApi.sendText(
           whatsappNumber,
-          '❌ Seu período de acesso expirou. Para continuar utilizando o serviço, escolha um plano:'
+          `❌ ${userName}, seu período de acesso expirou. Para continuar utilizando o serviço, escolha um plano:`
         );
         await evolutionApi.sendSubscriptionOptions(whatsappNumber);
         return res.status(200).json({ message: 'Subscription required message sent' });
@@ -95,6 +106,12 @@ class WebhookController {
 
   async handleTextMessage(user, content) {
     try {
+      console.log('Generating AI response for:', {
+        userName: user.name,
+        content,
+        planStatus: user.subscription.status
+      });
+
       // Get AI coach response
       const coachResponse = await openaiService.generateCoachResponse(
         user.name,
@@ -102,6 +119,8 @@ class WebhookController {
         user.plan,
         user.interactionHistory.slice(-5) // Last 5 interactions for context
       );
+
+      console.log('AI response generated:', coachResponse);
 
       // Store AI response in history
       user.interactionHistory.push({
@@ -122,7 +141,7 @@ class WebhookController {
         if (new Date() >= oneDayBefore && new Date() < trialEndDate) {
           await evolutionApi.sendText(
             user.whatsappNumber,
-            '⚠️ Lembrete: Seu período de teste termina amanhã! ' +
+            `⚠️ ${user.name}, seu período de teste termina amanhã! ` +
             'Para continuar tendo acesso a todas as funcionalidades, escolha um de nossos planos.'
           );
         }
@@ -141,7 +160,7 @@ class WebhookController {
     try {
       await evolutionApi.sendText(
         user.whatsappNumber,
-        '🎵 Recebi seu áudio! Em breve teremos suporte para processamento de mensagens de voz.'
+        `🎵 ${user.name}, recebi seu áudio! Em breve teremos suporte para processamento de mensagens de voz.`
       );
     } catch (error) {
       console.error('Error handling audio message:', error);
@@ -156,7 +175,7 @@ class WebhookController {
     try {
       await evolutionApi.sendText(
         user.whatsappNumber,
-        '🖼️ Recebi sua imagem! Em breve teremos suporte para processamento de imagens.'
+        `🖼️ ${user.name}, recebi sua imagem! Em breve teremos suporte para processamento de imagens.`
       );
     } catch (error) {
       console.error('Error handling image message:', error);

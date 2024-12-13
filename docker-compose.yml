@@ -26,6 +26,8 @@ services:
     build:
       context: ./webhook-logger
     working_dir: /app
+    ports:
+      - "4000:4000"
     command: ["npm", "start"]
 
 volumes:

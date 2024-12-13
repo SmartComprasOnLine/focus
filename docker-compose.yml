@@ -28,8 +28,6 @@ services:
     volumes:
       - ./webhook-logger:/app
     command: ["node", "server.js"]
-    ports:
-      - "4000:4000"  # Expondo a porta 4000 para acesso ao logger
 
 volumes:
   mongodb_data:

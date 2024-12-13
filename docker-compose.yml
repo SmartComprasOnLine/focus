@@ -1,19 +1,16 @@
 services:
   app:
     build: .
-    container_name: focus-adhd-coach
     restart: always
-    ports:
-      - "3000:3000"
     environment:
       - NODE_ENV=production
       - MONGODB_URI=mongodb://mongodb:27017/focus_adhd
       - EVOLUTION_API_URL=https://evo.meuchatinteligente.com.br
-      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}  # Certifique-se de que isso está definido no EasyPanel
       - EVOLUTION_INSTANCE=desafio
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}  # Certifique-se de que isso está definido no EasyPanel
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}  # Certifique-se de que isso está definido no EasyPanel
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}  # Certifique-se de que isso está definido no EasyPanel
       - PLAN_MONTHLY_PRICE=9900
       - PLAN_YEARLY_PRICE=99900
     depends_on:
@@ -21,10 +18,7 @@ services:
 
   mongodb:
     image: mongo:latest
-    container_name: mongodb
     restart: always
-    ports:
-      - "27017:27017"
     volumes:
       - mongodb_data:/data/db
 

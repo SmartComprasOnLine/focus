@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 });
 
 // Routes
-app.use('/api', routes);
+app.use('/', routes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

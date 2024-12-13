@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const fetch = require('node-fetch');
 const app = express();
 const PORT = process.env.PORT || 4000;
+const MAIN_SERVICE_URL = process.env.MAIN_SERVICE_URL || 'http://app:3001/api/webhook';
 
 app.use(bodyParser.json());
 
@@ -67,12 +68,12 @@ app.post('/webhook', async (req, res) => {
         };
 
         console.log('Sending request to main service:', {
-            url: 'http://app:3001/api/webhook',
+            url: MAIN_SERVICE_URL,
             body: JSON.stringify(requestBody, null, 2)
         });
 
         // Encaminhar a requisição para o serviço principal
-        const response = await fetch('http://app:3001/api/webhook', {
+        const response = await fetch(MAIN_SERVICE_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -101,4 +102,5 @@ app.post('/webhook', async (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Webhook logger listening on port ${PORT}`);
+    console.log(`Main service URL: ${MAIN_SERVICE_URL}`);
 });

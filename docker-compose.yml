@@ -3,9 +3,10 @@ services:
     build: .
     restart: always
     ports:
-      - "3001:3000"
+      - "3001:3001"
     environment:
       - NODE_ENV=production
+      - PORT=3001
       - MONGODB_URI=mongodb://mongodb:27017/focus_adhd
       - EVOLUTION_API_URL=https://evo.meuchatinteligente.com.br
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}

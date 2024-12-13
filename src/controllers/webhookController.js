@@ -145,7 +145,29 @@ class WebhookController {
     }
   }
 
-  // ... (rest of the methods remain unchanged)
+  async handleTextMessage(user, messageContent) {
+    console.log('Processing text message:', messageContent);
+    await evolutionApi.sendText(
+      user.whatsappNumber,
+      `Você disse: ${messageContent}`
+    );
+  }
+
+  async handleAudioMessage(user, messageContent) {
+    console.log('Processing audio message:', messageContent);
+    await evolutionApi.sendText(
+      user.whatsappNumber,
+      'Recebi seu áudio, mas ainda estou aprendendo a processá-lo!'
+    );
+  }
+
+  async handleImageMessage(user, messageContent) {
+    console.log('Processing image message:', messageContent);
+    await evolutionApi.sendText(
+      user.whatsappNumber,
+      'Recebi sua imagem, mas ainda estou aprendendo a processá-la!'
+    );
+  }
 }
 
 module.exports = new WebhookController();

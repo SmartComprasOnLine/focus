@@ -13,6 +13,15 @@ app.post('/webhook', async (req, res) => {
         console.log(JSON.stringify(req.body, null, 2));
         console.log('=== WEBHOOK PAYLOAD END ===');
         
+        // Verificar se é um evento de mensagem
+        if (req.body.event !== 'messages.upsert') {
+            console.log('Ignoring non-message event:', req.body.event);
+            return res.status(200).send('Event ignored');
+        }
+
+        // Extrair dados da mensagem
+        const { data } = req.body;
+        
         // Encaminhar a requisição para o serviço principal
         const response = await fetch('http://app:3000/api/webhook/whatsapp', {
             method: 'POST',
@@ -23,22 +32,24 @@ app.post('/webhook', async (req, res) => {
                 messages: [
                     {
                         key: {
-                            remoteJid: req.body.key?.remoteJid || req.body.from,
-                            fromMe: req.body.key?.fromMe || false,
-                            id: req.body.key?.id || req.body.id
+                            remoteJid: data.key.remoteJid,
+                            fromMe: data.key.fromMe,
+                            id: data.key.id
                         },
+                        pushName: data.pushName,
                         message: {
-                            conversation: req.body.body || req.body.text || req.body.message,
-                            messageTimestamp: req.body.messageTimestamp || Date.now()
-                        }
+                            conversation: data.message.conversation,
+                            messageTimestamp: data.messageTimestamp
+                        },
+                        messageType: data.messageType
                     }
                 ]
             })
         });
 
-        const data = await response.json();
+        const responseData = await response.json();
         console.log('=== RESPONSE FROM MAIN SERVICE ===');
-        console.log(JSON.stringify(data, null, 2));
+        console.log(JSON.stringify(responseData, null, 2));
         console.log('=== RESPONSE END ===');
         
         res.status(200).send('Webhook received and processed');

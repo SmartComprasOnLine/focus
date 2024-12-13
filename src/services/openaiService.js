@@ -26,13 +26,27 @@ class OpenAIService {
       `;
 
       const messages = [
-        { role: 'system', content: systemPrompt },
-        ...interactionHistory.map(interaction => ({
-          role: interaction.role,
-          content: interaction.content
-        })),
-        { role: 'user', content: userMessage }
+        { role: 'system', content: systemPrompt }
       ];
+
+      // Adiciona o histórico de interações
+      if (interactionHistory && interactionHistory.length > 0) {
+        console.log('Processing interaction history:', JSON.stringify(interactionHistory, null, 2));
+        interactionHistory.forEach(interaction => {
+          if (!interaction.role) {
+            console.warn('Interaction missing role:', interaction);
+          }
+          messages.push({
+            role: interaction.role || 'user',  // Fallback para 'user' se role não estiver definido
+            content: interaction.content
+          });
+        });
+      }
+
+      // Adiciona a mensagem atual do usuário
+      messages.push({ role: 'user', content: userMessage });
+
+      console.log('OpenAI messages:', JSON.stringify(messages, null, 2));
 
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4',
@@ -44,6 +58,12 @@ class OpenAIService {
       return response.choices[0].message.content;
     } catch (error) {
       console.error('Error generating coach response:', error);
+      console.error('Error details:', {
+        userName,
+        userMessage,
+        currentPlan,
+        interactionHistory
+      });
       throw error;
     }
   }

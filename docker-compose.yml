@@ -2,8 +2,6 @@ services:
   app:
     build: .
     restart: always
-    ports:
-      - "3001:3001"
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -26,20 +24,6 @@ services:
     restart: always
     volumes:
       - mongodb_data:/data/db
-    networks:
-      - focus_network
-
-  webhook-logger:
-    build:
-      context: ./webhook-logger
-    working_dir: /app    
-    command: ["npm", "start"]
-    ports:
-      - "4000:4000"
-    environment:
-      - PORT=4000
-    depends_on:
-      - app
     networks:
       - focus_network
 

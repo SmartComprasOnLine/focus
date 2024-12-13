@@ -5,14 +5,22 @@ const openaiService = require('../services/openaiService');
 class WebhookController {
   async handleWebhook(req, res) {
     try {
-      const { type, body } = req.body;
+      console.log('Webhook payload:', JSON.stringify(req.body, null, 2));
       
-      if (type !== 'message') {
-        return res.status(200).json({ message: 'Non-message event received' });
+      // Extrair informações do webhook da Evolution API
+      const { messages } = req.body;
+      if (!messages || !messages[0]) {
+        return res.status(200).json({ message: 'No message in webhook' });
       }
 
-      const { from, type: messageType, content } = body;
-      const whatsappNumber = from.replace('@c.us', '');
+      const message = messages[0];
+      const whatsappNumber = message.key.remoteJid.replace('@s.whatsapp.net', '');
+      const messageContent = message.message?.conversation || 
+                           message.message?.extendedTextMessage?.text ||
+                           'Media message received';
+      const messageType = message.message?.conversation ? 'text' : 
+                         message.message?.audioMessage ? 'audio' :
+                         message.message?.imageMessage ? 'image' : 'unknown';
 
       // Find or create user
       let user = await User.findOne({ whatsappNumber });
@@ -30,7 +38,14 @@ class WebhookController {
         });
 
         // Send welcome message
-        await evolutionApi.sendWelcomeMessage(whatsappNumber, 'Novo Usuário');
+        await evolutionApi.sendText(
+          whatsappNumber,
+          '👋 Olá! Bem-vindo ao seu assistente pessoal para TDAH!\n\n' +
+          'Estou aqui para ajudar você a organizar sua rotina e melhorar seu foco. ' +
+          'Você tem 7 dias de teste gratuito para experimentar todas as funcionalidades.\n\n' +
+          'Como posso ajudar você hoje?'
+        );
+        
         return res.status(200).json({ message: 'Welcome message sent' });
       }
 
@@ -47,19 +62,20 @@ class WebhookController {
       // Store interaction in history
       user.interactionHistory.push({
         type: messageType,
-        content: content || 'Media message received'
+        content: messageContent,
+        role: 'user'
       });
 
       // Process message based on type
       switch (messageType) {
         case 'text':
-          await this.handleTextMessage(user, content);
+          await this.handleTextMessage(user, messageContent);
           break;
         case 'audio':
-          await this.handleAudioMessage(user, content);
+          await this.handleAudioMessage(user, messageContent);
           break;
         case 'image':
-          await this.handleImageMessage(user, content);
+          await this.handleImageMessage(user, messageContent);
           break;
         default:
           await evolutionApi.sendText(
@@ -87,6 +103,13 @@ class WebhookController {
         user.interactionHistory.slice(-5) // Last 5 interactions for context
       );
 
+      // Store AI response in history
+      user.interactionHistory.push({
+        type: 'text',
+        content: coachResponse,
+        role: 'assistant'
+      });
+
       // Send response to user
       await evolutionApi.sendText(user.whatsappNumber, coachResponse);
 
@@ -97,7 +120,11 @@ class WebhookController {
         oneDayBefore.setDate(oneDayBefore.getDate() - 1);
 
         if (new Date() >= oneDayBefore && new Date() < trialEndDate) {
-          await evolutionApi.sendTrialEndingReminder(user.whatsappNumber, user.name);
+          await evolutionApi.sendText(
+            user.whatsappNumber,
+            '⚠️ Lembrete: Seu período de teste termina amanhã! ' +
+            'Para continuar tendo acesso a todas as funcionalidades, escolha um de nossos planos.'
+          );
         }
       }
 

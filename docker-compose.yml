@@ -2,31 +2,49 @@ services:
   app:
     build: .
     restart: always
+    ports:
+      - "3000:3000"
     environment:
       - NODE_ENV=production
       - MONGODB_URI=mongodb://mongodb:27017/focus_adhd
       - EVOLUTION_API_URL=https://evo.meuchatinteligente.com.br
-      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}  # Certifique-se de que isso está definido no EasyPanel
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - EVOLUTION_INSTANCE=desafio
-      - OPENAI_API_KEY=${OPENAI_API_KEY}  # Certifique-se de que isso está definido no EasyPanel
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}  # Certifique-se de que isso está definido no EasyPanel
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}  # Certifique-se de que isso está definido no EasyPanel
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - PLAN_MONTHLY_PRICE=9900
       - PLAN_YEARLY_PRICE=99900
     depends_on:
       - mongodb
+    networks:
+      - focus_network
 
   mongodb:
     image: mongo:latest
     restart: always
     volumes:
       - mongodb_data:/data/db
+    networks:
+      - focus_network
 
   webhook-logger:
     build:
       context: ./webhook-logger
     working_dir: /app    
     command: ["npm", "start"]
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+    depends_on:
+      - app
+    networks:
+      - focus_network
+
+networks:
+  focus_network:
+    driver: bridge
 
 volumes:
   mongodb_data:

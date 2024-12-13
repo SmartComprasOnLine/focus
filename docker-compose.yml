@@ -23,11 +23,13 @@ services:
       - mongodb_data:/data/db
 
   webhook-logger:
-    image: node:18-alpine
+    build:
+      context: ./webhook-logger
     working_dir: /app
     volumes:
       - ./webhook-logger:/app
-    command: ["node", "server.js"]
+    command: ["npm", "start"]
+   
 
 volumes:
   mongodb_data:

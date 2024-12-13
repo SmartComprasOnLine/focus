@@ -1,13 +1,14 @@
 FROM node:18-alpine
 
 WORKDIR /app
-
 COPY package*.json ./
 
-RUN npm cache clean --force && npm install
+# Install build tools for native packages if needed
+RUN apk update && apk add --no-cache python3 make g++
+
+# Run npm install without the cache clean first to isolate issues
+RUN npm install
 
 COPY . .
-
-EXPOSE 3000
 
 CMD ["npm", "start"]

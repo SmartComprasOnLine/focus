@@ -11,7 +11,7 @@ app.post('/webhook', async (req, res) => {
     
     try {
         // Encaminhar a requisição para o serviço principal
-        const response = await fetch('http://app:3000/webhook', {
+        const response = await fetch('http://app:3000/api/webhook/whatsapp', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

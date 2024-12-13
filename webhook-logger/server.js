@@ -20,8 +20,29 @@ app.post('/webhook', async (req, res) => {
         }
 
         // Extrair dados da mensagem
-        const { data } = req.body;
+        const { data, instance } = req.body;
         
+        // Verificar se a mensagem é válida
+        if (!data || !data.key || !data.message) {
+            console.log('Invalid message format:', req.body);
+            return res.status(200).send('Invalid message format');
+        }
+
+        // Determinar o tipo de mensagem
+        let messageType = 'unknown';
+        let messageContent = '';
+
+        if (data.message.conversation) {
+            messageType = 'text';
+            messageContent = data.message.conversation;
+        } else if (data.message.audioMessage) {
+            messageType = 'audio';
+            messageContent = data.message.audioMessage.url || 'Audio received';
+        } else if (data.message.imageMessage) {
+            messageType = 'image';
+            messageContent = data.message.imageMessage.url || 'Image received';
+        }
+
         // Encaminhar a requisição para o serviço principal
         const response = await fetch('http://app:3000/api/webhook/whatsapp', {
             method: 'POST',
@@ -29,6 +50,7 @@ app.post('/webhook', async (req, res) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
+                instance,
                 messages: [
                     {
                         key: {
@@ -38,10 +60,14 @@ app.post('/webhook', async (req, res) => {
                         },
                         pushName: data.pushName,
                         message: {
-                            conversation: data.message.conversation,
+                            conversation: messageContent,
                             messageTimestamp: data.messageTimestamp
                         },
-                        messageType: data.messageType
+                        messageType,
+                        metadata: {
+                            source: data.source,
+                            instanceId: data.instanceId
+                        }
                     }
                 ]
             })

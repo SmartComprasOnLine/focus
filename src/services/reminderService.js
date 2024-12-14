@@ -51,6 +51,8 @@ class ReminderService {
       
       const afterJob = cron.schedule(afterExpression, async () => {
         await this.sendActivityReminder(user, activity, 'after');
+        // Perguntar sobre a conclusão da atividade
+        await this.askActivityCompletion(user, activity);
       });
       
       reminders.push(
@@ -114,6 +116,39 @@ class ReminderService {
     await evolutionApi.sendText(user.whatsappNumber, message);
   }
 
+  async askActivityCompletion(user, activity) {
+    const motivationalMessages = {
+      'planejamento': 'Planejar é o primeiro passo para o sucesso! 🎯',
+      'trabalho': 'Cada tarefa completada é uma vitória! 💪',
+      'estudo': 'O conhecimento é a chave para o crescimento! 📚',
+      'pausa': 'Pausas são essenciais para manter o foco! 🧘‍♂️',
+      'revisão': 'Revisar nos ajuda a melhorar sempre! 📊'
+    };
+
+    await evolutionApi.sendList(
+      user.whatsappNumber,
+      'Confirmação de Atividade',
+      `Você conseguiu completar a atividade "${activity.activity}"?\n\n` +
+      `${motivationalMessages[activity.type] || '✨ Cada passo conta!'}`,
+      'Confirmar',
+      [{
+        title: 'Status da Atividade',
+        rows: [
+          {
+            title: '✅ Sim, completei!',
+            description: 'Marcar atividade como concluída',
+            rowId: `completed_${activity._id}`
+          },
+          {
+            title: '❌ Não consegui',
+            description: 'Preciso de ajuda ou ajustes',
+            rowId: `not_completed_${activity._id}`
+          }
+        ]
+      }]
+    );
+  }
+
   cancelUserReminders(userId) {
     const userReminders = this.activeReminders.get(userId);
     if (userReminders) {
@@ -156,8 +191,7 @@ class ReminderService {
   getScheduledTime(timeString) {
     const [hours, minutes] = timeString.split(':').map(Number);
     const date = new Date();
-    // Ajusta para o fuso horário local (GMT-3)
-    date.setHours(hours - 3, minutes, 0, 0);
+    date.setHours(hours, minutes, 0, 0);
     return date;
   }
 

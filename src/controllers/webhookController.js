@@ -185,6 +185,79 @@ class WebhookController {
         });
         logMessage('info', 'User interaction stored:', user.interactionHistory);
 
+        // Check for activity completion response
+        const completionMatch = messageContent.toLowerCase().match(/completed_([a-f0-9]+)/);
+        const notCompletedMatch = messageContent.toLowerCase().match(/not_completed_([a-f0-9]+)/);
+        
+        if (completionMatch || notCompletedMatch) {
+          const activityId = (completionMatch || notCompletedMatch)[1];
+          const isCompleted = !!completionMatch;
+          
+          const routine = await Routine.findOne({ userId: user._id });
+          if (routine) {
+            const activity = routine.activities.id(activityId);
+            if (activity) {
+              activity.status = isCompleted ? 'completed' : 'active';
+              if (isCompleted) {
+                activity.completedAt = timezoneService.getCurrentTime();
+              }
+              await routine.save();
+
+              if (isCompleted) {
+                await evolutionApi.sendText(
+                  whatsappNumber,
+                  `🎉 Parabéns por completar "${activity.activity}"!\n\n` +
+                  `Continue assim! Cada atividade completada é um passo em direção aos seus objetivos. 💪✨`
+                );
+              } else {
+                // Gerar sugestões personalizadas baseadas no tipo de atividade
+                const suggestions = {
+                  'planejamento': [
+                    '📝 Tente dividir suas tarefas em partes menores',
+                    '🎯 Foque nas 3 prioridades principais',
+                    '⏰ Reserve horários específicos para cada tarefa'
+                  ],
+                  'trabalho': [
+                    '🎧 Use música instrumental para ajudar na concentração',
+                    '⏲️ Experimente a técnica Pomodoro (25min trabalho, 5min pausa)',
+                    '📱 Minimize distrações desativando notificações'
+                  ],
+                  'estudo': [
+                    '📚 Tente técnicas diferentes de estudo',
+                    '✍️ Faça anotações ou mapas mentais',
+                    '👥 Considere estudar em grupo'
+                  ],
+                  'pausa': [
+                    '🧘‍♂️ Pratique exercícios de respiração',
+                    '🚶‍♂️ Faça uma caminhada curta',
+                    '💧 Mantenha-se hidratado'
+                  ],
+                  'revisão': [
+                    '📊 Use listas de verificação',
+                    '📝 Anote os pontos principais',
+                    '🎯 Identifique áreas para melhorar'
+                  ]
+                };
+
+                const typeSuggestions = suggestions[activity.type] || [
+                  '🎯 Divida a tarefa em partes menores',
+                  '⏰ Estabeleça um horário específico',
+                  '📝 Anote o que está dificultando'
+                ];
+
+                await evolutionApi.sendText(
+                  whatsappNumber,
+                  `Entendo que você teve dificuldade com "${activity.activity}". Não se preocupe, isso é normal! 🤗\n\n` +
+                  `Aqui estão algumas sugestões que podem ajudar:\n\n` +
+                  typeSuggestions.map(s => `• ${s}`).join('\n') +
+                  `\n\nVamos tentar novamente? Estou aqui para ajudar! 💪`
+                );
+              }
+            }
+          }
+          return res.status(200).json({ message: 'Activity status updated' });
+        }
+
         // Check for plan selection
         const planMatch = messageContent.toLowerCase().match(/plano_(mensal|anual)/);
         if (planMatch) {

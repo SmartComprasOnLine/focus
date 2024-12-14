@@ -1,5 +1,5 @@
-require('dotenv').config();
 const moment = require('moment-timezone');
+require('dotenv').config();
 
 class TimezoneService {
     constructor() {
@@ -54,6 +54,22 @@ class TimezoneService {
 
     isAfterNow(date) {
         return moment(date).tz(this.timezone).isAfter(this.getCurrentTime());
+    }
+
+    getScheduledTime(timeString) {
+        try {
+            const [hours, minutes] = timeString.split(':').map(Number);
+            const now = this.getCurrentTime();
+            return now.clone()
+                .hours(hours)
+                .minutes(minutes)
+                .seconds(0)
+                .milliseconds(0)
+                .toDate();
+        } catch (error) {
+            console.error('Error converting time:', error);
+            throw error;
+        }
     }
 
     parseUserTime(timeString) {

@@ -2,6 +2,7 @@ const Routine = require('../models/Routine');
 const openaiService = require('../services/openaiService');
 const evolutionApi = require('../services/evolutionApi');
 const reminderService = require('../services/reminderService');
+const timezoneService = require('../services/timezoneService');
 
 class RoutineController {
   async createInitialPlan(user, userResponses) {
@@ -9,14 +10,32 @@ class RoutineController {
       // Gerar plano personalizado e lembretes usando OpenAI
       const { plan, reminders } = await openaiService.generateInitialPlan(user.name, userResponses);
 
+      console.log('Generated reminders:', JSON.stringify(reminders, null, 2));
+
       // Converter os lembretes em atividades
-      const activities = reminders.map(reminder => ({
-        activity: reminder.activity,
-        scheduledTime: this.getScheduledTime(reminder.scheduledTime),
-        type: reminder.type,
-        status: 'active',
-        messages: reminder.messages
-      }));
+      const activities = reminders.map(reminder => {
+        const scheduledTime = timezoneService.getScheduledTime(reminder.scheduledTime);
+        console.log(`Converting time ${reminder.scheduledTime} to ${timezoneService.formatDate(scheduledTime)}`);
+        
+        return {
+          activity: reminder.activity,
+          scheduledTime: scheduledTime,
+          type: reminder.type || 'geral',
+          status: 'active',
+          messages: reminder.messages || {
+            before: `⏰ Em 5 minutos: ${reminder.activity}`,
+            start: `🎯 Hora de ${reminder.activity}`,
+            during: `💪 Continue focado em ${reminder.activity}`,
+            after: `✅ Como foi ${reminder.activity}?`
+          }
+        };
+      });
+
+      console.log('Converted activities:', JSON.stringify(activities.map(a => ({
+        activity: a.activity,
+        scheduledTime: timezoneService.formatDate(a.scheduledTime),
+        type: a.type
+      })), null, 2));
 
       // Criar nova rotina no banco de dados
       const routine = await Routine.create({
@@ -29,6 +48,9 @@ class RoutineController {
       user.currentPlan = routine._id;
       await user.save();
 
+      // Configurar lembretes
+      await reminderService.setupReminders(user, routine);
+
       // Enviar plano para o usuário
       await evolutionApi.sendText(
         user.whatsappNumber,
@@ -40,19 +62,6 @@ class RoutineController {
       return routine;
     } catch (error) {
       console.error('Error creating initial plan:', error);
-      throw error;
-    }
-  }
-
-  getScheduledTime(timeString) {
-    try {
-      const [hours, minutes] = timeString.split(':').map(Number);
-      const date = new Date();
-      // Ajusta para o fuso horário local (GMT-3)
-      date.setHours(hours - 3, minutes, 0, 0);
-      return date;
-    } catch (error) {
-      console.error('Error converting time:', error);
       throw error;
     }
   }
@@ -74,6 +83,7 @@ class RoutineController {
           const activity = routine.activities.id(taskId);
           if (activity) {
             activity.status = 'completed';
+            activity.completedAt = timezoneService.getCurrentTime();
           }
         });
         await routine.save();

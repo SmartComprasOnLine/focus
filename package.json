@@ -15,6 +15,7 @@
     "helmet": "^7.1.0",
     "mongoose": "^8.0.3",
     "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
     "openai": "^4.24.0",
     "stripe": "^8.0.0"
   }

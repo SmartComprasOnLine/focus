@@ -1,21 +1,64 @@
 const User = require('../models/User');
+const Routine = require('../models/Routine');
 const evolutionApi = require('../services/evolutionApi');
 const openaiService = require('../services/openaiService');
+const reminderService = require('../services/reminderService');
+const stripeService = require('../services/stripeService');
+
+const logMessage = (level, message) => {
+    console.log(JSON.stringify({ level, message, timestamp: new Date().toISOString() }));
+};
 
 class WebhookController {
   async handleWebhook(req, res) {
-    let user; // Define user variable here
+    let user;
     try {
-      console.log('=== WEBHOOK REQUEST START ===');
-      console.log('Webhook payload:', JSON.stringify(req.body, null, 2));
+      logMessage('info', '=== WEBHOOK REQUEST START ===');
+      logMessage('info', 'Webhook payload:', req.body);
       
-      // Log the incoming request body for debugging
-      console.log('Incoming request body:', JSON.stringify(req.body, null, 2));
+      // Handle Stripe webhook events
+      if (req.body.type === 'checkout.session.completed') {
+        const session = req.body.data.object;
+        const { userNumber, planType } = session.metadata;
+        
+        user = await User.findOne({ whatsappNumber: userNumber });
+        if (!user) {
+          logMessage('error', 'User not found for Stripe webhook:', userNumber);
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        const subscriptionEnd = new Date();
+        if (planType === 'mensal') {
+          subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 1);
+        } else if (planType === 'anual') {
+          subscriptionEnd.setFullYear(subscriptionEnd.getFullYear() + 1);
+        }
+
+        user.subscription = {
+          status: 'ativa',
+          plan: planType,
+          startDate: new Date(),
+          endDate: subscriptionEnd,
+          paymentId: session.payment_intent
+        };
+
+        await user.save();
+
+        await evolutionApi.sendText(
+          userNumber,
+          `🎉 Pagamento confirmado!\n\n` +
+          `Seu Plano ${planType.charAt(0).toUpperCase() + planType.slice(1)} foi ativado com sucesso.\n\n` +
+          `Período: ${planType === 'mensal' ? '1 mês' : '1 ano'}\n` +
+          `Validade: ${subscriptionEnd.toLocaleDateString()}\n\n` +
+          `Continue contando comigo para organizar sua rotina e melhorar seu foco! 💪✨`
+        );
+        return res.status(200).json({ message: 'Subscription activated' });
+      }
       
-      // Extract information from the webhook from Evolution API
+      // Handle WhatsApp messages
       const { data } = req.body;
       if (!data || !data.key || !data.message) {
-        console.log('No message in webhook');
+        logMessage('warning', 'No message in webhook');
         return res.status(200).json({ message: 'No message in webhook' });
       }
 
@@ -26,32 +69,22 @@ class WebhookController {
       const messageType = data.messageType === 'conversation' ? 'text' : data.messageType || 'text';
       const userName = data.pushName || 'Novo Usuário';
 
-      // Log extracted values for debugging
-      console.log('Extracted values:', {
-        whatsappNumber,
-        messageContent,
-        messageType,
-        userName
-      });
-      
-      console.log('Processed message:', {
+      logMessage('info', 'Extracted values:', {
         whatsappNumber,
         messageContent,
         messageType,
         userName
       });
 
-      // Find or create user
-      console.log('Finding user:', whatsappNumber);
+      logMessage('info', 'Finding user:', whatsappNumber);
       user = await User.findOne({ whatsappNumber });
       
       if (!user) {
-        console.log('Creating new user:', {
+        logMessage('info', 'Creating new user:', {
           whatsappNumber,
           userName
         });
         
-        // New user - start trial
         user = await User.create({
           whatsappNumber,
           name: userName,
@@ -62,149 +95,253 @@ class WebhookController {
           }
         });
 
-        console.log('New user created:', user);
-
-        // Send welcome message
-        console.log('Sending welcome message');
-        await evolutionApi.sendText(
-          whatsappNumber,
-          `👋 Olá ${userName}! Bem-vindo ao seu assistente pessoal para TDAH!\n\n` +
-          'Estou aqui para ajudar você a organizar sua rotina e melhorar seu foco. ' +
-          'Você tem 7 dias de teste gratuito para experimentar todas as funcionalidades.\n\n' +
-          'Como posso ajudar você hoje?'
-        );
+        logMessage('info', 'New user created:', user);
+        logMessage('info', 'Sending welcome message');
+        await evolutionApi.sendWelcomeMessage(whatsappNumber, userName);
         
-        console.log('Welcome message sent');
+        logMessage('info', 'Welcome message sent');
         return res.status(200).json({ message: 'Welcome message sent' });
       }
 
-      // Update user name if different and save user
       if (user.name !== userName && userName !== 'Novo Usuário') {
-        console.log('Updating user name:', {
+        logMessage('info', 'Updating user name:', {
           old: user.name,
           new: userName
         });
         user.name = userName;
-        await user.save(); // Ensure user is saved after name update
+        await user.save();
       }
 
-      // Check access
-      console.log('Checking user access:', {
+      logMessage('info', 'Checking user access:', {
         status: user.subscription.status,
-        hasAccess: user.hasAccess()
+        hasAccess: user.hasAccess(),
+        trialEndDate: user.subscription.trialEndDate
       });
 
+      const now = new Date();
+      const trialEndDate = new Date(user.subscription.trialEndDate);
+      const daysRemaining = Math.ceil((trialEndDate - now) / (1000 * 60 * 60 * 24));
+
+      const monthlyPrice = (process.env.PLAN_MONTHLY_PRICE / 100).toFixed(2);
+      const yearlyPrice = (process.env.PLAN_YEARLY_PRICE / 100).toFixed(2);
+
       if (!user.hasAccess()) {
-        console.log('User access expired, sending subscription options');
-        await evolutionApi.sendText(
+        logMessage('warning', 'User access expired, sending subscription options');
+        await evolutionApi.sendList(
           whatsappNumber,
-          `❌ ${userName}, seu período de acesso expirou. Para continuar utilizando o serviço, escolha um plano:`
+          "Escolha seu plano",
+          "Seu período de teste expirou! Para continuar tendo acesso e manter seu progresso, escolha um plano:",
+          "Ver Planos",
+          [
+            {
+              title: "Planos Disponíveis",
+              rows: [
+                {
+                  title: "Plano Mensal",
+                  description: `R$ ${monthlyPrice}/mês - Acesso a todas as funcionalidades`,
+                  rowId: "plano_mensal"
+                },
+                {
+                  title: "Plano Anual",
+                  description: `R$ ${yearlyPrice}/ano - Economia de 2 meses!`,
+                  rowId: "plano_anual"
+                }
+              ]
+            }
+          ]
         );
-        await evolutionApi.sendSubscriptionOptions(whatsappNumber);
         return res.status(200).json({ message: 'Subscription required message sent' });
+      } else if (daysRemaining === 1) {
+        await evolutionApi.sendList(
+          whatsappNumber,
+          "Escolha seu plano",
+          "Seu período de teste termina amanhã! Para continuar tendo acesso e manter seu progresso, escolha um plano:",
+          "Ver Planos",
+          [
+            {
+              title: "Planos Disponíveis",
+              rows: [
+                {
+                  title: "Plano Mensal",
+                  description: `R$ ${monthlyPrice}/mês - Acesso a todas as funcionalidades`,
+                  rowId: "plano_mensal"
+                },
+                {
+                  title: "Plano Anual",
+                  description: `R$ ${yearlyPrice}/ano - Economia de 2 meses!`,
+                  rowId: "plano_anual"
+                }
+              ]
+            }
+          ]
+        );
       }
 
-      // Store user interaction in history
       if (messageType && messageContent) {
+        // Check for plan selection
+        const planMatch = messageContent.toLowerCase().match(/plano_(mensal|anual)/);
+        if (planMatch) {
+          const planType = planMatch[1];
+          
+          try {
+            const session = await stripeService.createPaymentSession(planType, whatsappNumber);
+            
+            await evolutionApi.sendText(
+              whatsappNumber,
+              `Ótima escolha! 🎉\n\n` +
+              `Para ativar seu Plano ${planType.charAt(0).toUpperCase() + planType.slice(1)}, clique no link abaixo para realizar o pagamento de forma segura:\n\n` +
+              `${session.url}\n\n` +
+              `Após o pagamento, seu plano será ativado automaticamente e você poderá continuar usando todas as funcionalidades! 💪`
+            );
+
+            // Store session ID in user data
+            user.subscription.pendingPayment = {
+              sessionId: session.id,
+              planType: planType,
+              createdAt: new Date()
+            };
+            await user.save();
+            return res.status(200).json({ message: 'Payment link sent' });
+          } catch (error) {
+            console.error('Error creating payment session:', error);
+            await evolutionApi.sendText(
+              whatsappNumber,
+              "Desculpe, tivemos um problema ao processar sua solicitação. Por favor, tente novamente em alguns minutos."
+            );
+            return res.status(500).json({ error: 'Payment session creation failed' });
+          }
+        }
+
         user.interactionHistory.push({
           type: messageType,
           content: messageContent,
           role: 'user'
         });
-        console.log('User interaction stored:', user.interactionHistory);
+        logMessage('info', 'User interaction stored:', user.interactionHistory);
       }
 
-      // Process message based on type
-      console.log('Processing message by type:', messageType);
+      logMessage('info', 'Processing message by type:', messageType);
       if (messageType === 'text') {
-        console.log('Handling text message');
+        logMessage('info', 'Handling text message');
         const response = await this.handleTextMessage(user, messageContent);
         
-        // Store assistant response in history
-        user.interactionHistory.push({
-          type: 'text',
-          content: response,
-          role: 'assistant'
-        });
-        console.log('Assistant response stored:', user.interactionHistory);
-      }
-
-      // Log the message type for debugging
-      console.log('Message type:', messageType);
-      console.log('Processing message by type:', messageType);
-      if (messageType === 'text') {
-        console.log('Handling text message');
-        await this.handleTextMessage(user, messageContent);
+        if (response) {
+          user.interactionHistory.push({
+            type: 'text',
+            content: response,
+            role: 'assistant'
+          });
+          logMessage('info', 'Assistant response stored:', user.interactionHistory);
+        }
       } else if (messageType === 'audio') {
-        console.log('Handling audio message');
+        logMessage('info', 'Handling audio message');
         await this.handleAudioMessage(user, messageContent);
       } else if (messageType === 'image') {
-        console.log('Handling image message');
+        logMessage('info', 'Handling image message');
         await this.handleImageMessage(user, messageContent);
       } else {
-        console.log('Unknown message type, sending default response');
+        logMessage('warning', 'Unknown message type, sending default response');
         await evolutionApi.sendText(
           whatsappNumber,
           '🤔 Desculpe, ainda não sei processar esse tipo de mensagem.'
         );
       }
 
-      console.log('Current interaction history:', user.interactionHistory);
+      logMessage('info', 'Current interaction history:', user.interactionHistory);
       await user.save();
-      console.log('User saved successfully with updated interaction history.');
-      console.log('=== WEBHOOK REQUEST END ===');
+      logMessage('info', 'User saved successfully with updated interaction history.');
+      logMessage('info', '=== WEBHOOK REQUEST END ===');
       return res.status(200).json({ message: 'Message processed successfully' });
 
     } catch (error) {
-      console.error('=== ERROR PROCESSING WEBHOOK ===', {
+      logMessage('error', '=== ERROR PROCESSING WEBHOOK ===', {
         message: error.message,
         requestBody: JSON.stringify(req.body, null, 2),
         user: user ? { whatsappNumber: user.whatsappNumber, name: user.name } : null
       });
-      console.error('Error details:', error); // Log the error details
-      console.error('Stack trace:', error.stack);
-      console.error('=== ERROR END ===');
+      logMessage('error', 'Error details:', error);
+      logMessage('error', 'Stack trace:', error.stack);
+      logMessage('error', '=== ERROR END ===');
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
   async handleTextMessage(user, messageContent) {
-    console.log('Processing text message:', messageContent);
-    // Chamar a função de geração de resposta da IA
+    logMessage('info', 'Processing text message:', messageContent);
+
+    const isRoutineInfo = this.isRoutineInformation(messageContent);
+    const isPlanConfirmation = this.isPlanConfirmation(messageContent);
+    
+    if (isRoutineInfo && !user.currentPlan) {
+      logMessage('info', 'Creating initial plan based on user response');
+      const routineController = require('./routineController');
+      await routineController.createInitialPlan(user, {
+        initialMessage: messageContent,
+        previousResponses: user.interactionHistory
+      });
+      return "Ótimo! Estou criando seu plano personalizado com base nas informações que você me forneceu. 🎯";
+    }
+
+    if (isPlanConfirmation && user.currentPlan) {
+      logMessage('info', 'User confirmed the plan, starting daily tracking');
+      
+      const routine = await Routine.findById(user.currentPlan);
+      if (!routine) {
+        throw new Error('Routine not found');
+      }
+
+      await reminderService.setupReminders(user, routine);
+      logMessage('info', 'Reminders configured successfully');
+
+      await evolutionApi.sendText(
+        user.whatsappNumber,
+        "Perfeito! 🎉 Seu plano está confirmado e os lembretes foram configurados.\n\n" +
+        "🔸 Você receberá lembretes 5 minutos antes de cada atividade\n" +
+        "🔸 Durante as atividades, enviarei mensagens de motivação\n" +
+        "🔸 Ao final de cada atividade, farei um checkpoint do seu progresso\n\n" +
+        "Preparado para começar? Vamos focar na primeira tarefa do seu dia! 💪"
+      );
+      return;
+    }
+
     const response = await openaiService.generateCoachResponse(
         user.name,
         messageContent,
-        user.currentPlan, // Supondo que você tenha o plano atual do usuário
+        user.currentPlan,
         user.interactionHistory
     );
 
-    // Enviar a resposta gerada ao usuário
     await evolutionApi.sendText(
         user.whatsappNumber,
         response
     );
 
-    // Armazenar a resposta do assistente no histórico
-    user.interactionHistory.push({
-        type: 'text',
-        content: response,
-        role: 'assistant'
-    });
-    console.log('Assistant response stored:', user.interactionHistory);
+    return response;
+  }
 
-     // Remover a chamada redundante
+  isRoutineInformation(message) {
+    const routineKeywords = [
+      'rotina', 'horário', 'agenda', 'dia', 'manhã', 'tarde', 'noite',
+      'acordo', 'durmo', 'trabalho', 'estudo', 'faço', 'costumo',
+      'sempre', 'geralmente', 'normalmente', 'hábito'
+    ];
 
-    // Store assistant response in history
-    user.interactionHistory.push({
-      type: 'text',
-      content: automatedResponse,
-      role: 'assistant'
-    });
-    console.log('Assistant response stored:', user.interactionHistory);
+    const lowercaseMessage = message.toLowerCase();
+    return routineKeywords.some(keyword => lowercaseMessage.includes(keyword));
+  }
+
+  isPlanConfirmation(message) {
+    const confirmationKeywords = [
+      'sim', 'ok', 'confirmo', 'confirmado', 'pode ser',
+      'gostei', 'aceito', 'vamos', 'bom', 'ótimo', 'perfeito'
+    ];
+
+    const lowercaseMessage = message.toLowerCase();
+    return confirmationKeywords.some(keyword => lowercaseMessage.includes(keyword));
   }
 
   async handleAudioMessage(user, messageContent) {
-    console.log('Processing audio message:', messageContent);
+    logMessage('info', 'Processing audio message:', messageContent);
     await evolutionApi.sendText(
       user.whatsappNumber,
       'Recebi seu áudio, mas ainda estou aprendendo a processá-lo!'
@@ -212,7 +349,7 @@ class WebhookController {
   }
 
   async handleImageMessage(user, messageContent) {
-    console.log('Processing image message:', messageContent);
+    logMessage('info', 'Processing image message:', messageContent);
     await evolutionApi.sendText(
       user.whatsappNumber,
       'Recebi sua imagem, mas ainda estou aprendendo a processá-la!'

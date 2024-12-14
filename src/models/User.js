@@ -1,10 +1,7 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true
-  },
+  name: String,
   whatsappNumber: {
     type: String,
     required: true,
@@ -16,89 +13,47 @@ const userSchema = new mongoose.Schema({
       enum: ['em_teste', 'ativa', 'inativa'],
       default: 'em_teste'
     },
-    trialStartDate: {
-      type: Date,
-      default: Date.now
-    },
-    trialEndDate: {
-      type: Date,
-      default: function() {
-        const date = new Date(this.trialStartDate);
-        date.setDate(date.getDate() + 7);
-        return date;
-      }
-    },
-    plan: {
-      type: String,
-      enum: ['none', 'monthly', 'yearly'],
-      default: 'none'
-    },
+    trialStartDate: Date,
+    trialEndDate: Date,
+    plan: String,
     startDate: Date,
     endDate: Date,
-    stripeCustomerId: String
-  },
-  plan: {
-    activities: [{
-      name: String,
-      description: String,
-      schedule: String,
-      completed: {
-        type: Boolean,
-        default: false
-      }
-    }],
-    lastUpdated: {
-      type: Date,
-      default: Date.now
+    paymentId: String,
+    pendingPayment: {
+      sessionId: String,
+      planType: String,
+      createdAt: Date
     }
   },
-  notifications: [{
-    message: String,
-    scheduledFor: Date,
-    sent: {
-      type: Boolean,
-      default: false
-    }
-  }],
+  currentPlan: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Routine'
+  },
   interactionHistory: [{
-    type: {
-      type: String,
-      enum: ['text', 'audio', 'image']
-    },
-    content: String,
-    role: {
-      type: String,
-      enum: ['user', 'assistant', 'system'],
-      required: true
-    },
+    type: { type: String },
+    content: { type: String },
+    role: { type: String },
     timestamp: {
       type: Date,
       default: Date.now
-    }
-  }],
-  routines: [{  // New field for routines
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Routine'
+    },
+    _id: false
   }]
 }, {
   timestamps: true
 });
 
-// Method to check if trial is active
-userSchema.methods.isTrialActive = function() {
-  return this.subscription.status === 'em_teste' && 
-         new Date() <= this.subscription.trialEndDate;
-};
-
-// Method to check if subscription is active
-userSchema.methods.isSubscriptionActive = function() {
-  return this.subscription.status === 'ativa' && 
-         (!this.subscription.endDate || new Date() <= this.subscription.endDate);
-};
-
-// Method to check if user has access to services
 userSchema.methods.hasAccess = function() {
-  return this.isTrialActive() || this.isSubscriptionActive();
+  if (this.subscription.status === 'ativa') {
+    return true;
+  }
+  
+  if (this.subscription.status === 'em_teste') {
+    const now = new Date();
+    return now <= this.subscription.trialEndDate;
+  }
+  
+  return false;
 };
 
 const User = mongoose.model('User', userSchema);

@@ -1,10 +1,12 @@
 const axios = require('axios');
+require('dotenv').config();
 
 class EvolutionApiService {
   constructor() {
     this.baseURL = process.env.EVOLUTION_API_URL;
     this.apiKey = process.env.EVOLUTION_API_KEY;
-    this.instance = process.env.EVOLUTION_INSTANCE;
+    this.instance = process.env.EVOLUTION_INSTANCE; 
+    console.log('EVOLUTION_INSTANCE:', this.instance);
     
     this.axiosInstance = axios.create({
       baseURL: this.baseURL,
@@ -15,13 +17,10 @@ class EvolutionApiService {
     });
   }
 
-  // Função auxiliar para calcular o delay baseado no tamanho do texto
   calculateDelay(text) {
-    // Média de digitação: 40 palavras por minuto = ~200 caracteres por minuto
-    // Isso significa ~3.33 caracteres por segundo
     const charactersPerSecond = 3.33;
-    const minDelay = 2000; // Delay mínimo de 2 segundos
-    const maxDelay = 8000; // Delay máximo de 8 segundos
+    const minDelay = 2000;
+    const maxDelay = 8000;
     
     const delay = Math.ceil(text.length / charactersPerSecond) * 1000;
     return Math.min(Math.max(delay, minDelay), maxDelay);
@@ -29,8 +28,15 @@ class EvolutionApiService {
 
   async sendText(number, text) {
     try {
+      console.log('SendText called with:', { number, text });
+      console.log('Current instance:', this.instance);
+      console.log('Current baseURL:', this.baseURL);
+      
       const delay = this.calculateDelay(text);
-      const response = await this.axiosInstance.post(`/message/sendText/${this.instance}`, {
+      const url = `/message/sendText/${this.instance}`;
+      console.log('Request URL:', url);
+      
+      const response = await this.axiosInstance.post(url, {
         number,
         text,
         delay
@@ -65,7 +71,7 @@ class EvolutionApiService {
       const response = await this.axiosInstance.post(`/message/sendWhatsAppAudio/${this.instance}`, {
         number,
         audio: audioUrl,
-        delay: 2000 // Delay fixo para áudio
+        delay: 2000
       });
       return response.data;
     } catch (error) {
@@ -76,49 +82,32 @@ class EvolutionApiService {
 
   async sendList(number, title, description, buttonText, sections) {
     try {
-      // Calcula o delay baseado no título e descrição combinados
-      const combinedText = `${title} ${description}`;
-      const delay = this.calculateDelay(combinedText);
-      
-      const response = await this.axiosInstance.post(`/message/sendList/${this.instance}`, {
-        number,
-        title,
-        description,
-        buttonText,
-        sections,
-        delay
-      });
+      const data = {
+        number: number,
+        title: title,
+        description: description,
+        buttonText: buttonText,
+        footerText: "Escolha uma opção",
+        sections: sections,
+        delay: 1000
+      };
+
+      console.log('Sending list with data:', JSON.stringify(data, null, 2));
+
+      const response = await this.axiosInstance.post(`/message/sendList/${this.instance}`, data);
       return response.data;
     } catch (error) {
       console.error('Error sending list:', error);
-      throw error;
+      // Fallback to text message if list fails
+      await this.sendText(
+        number,
+        `${description}\n\n` +
+        sections[0].rows.map(row => 
+          `• ${row.title}: ${row.description}`
+        ).join('\n\n') +
+        '\n\nResponda com o nome do plano desejado.'
+      );
     }
-  }
-
-  async sendSubscriptionOptions(number) {
-    const monthlyPrice = (process.env.PLAN_MONTHLY_PRICE / 100).toFixed(2);
-    const yearlyPrice = (process.env.PLAN_YEARLY_PRICE / 100).toFixed(2);
-
-    return this.sendList(number, 
-      'Escolha um plano',
-      'Planos disponíveis',
-      'Ver Planos',
-      [{
-        title: 'Planos',
-        rows: [
-          {
-            title: 'Plano Mensal',
-            description: `R$ ${monthlyPrice} por mês`,
-            rowId: 'mensal'
-          },
-          {
-            title: 'Plano Anual',
-            description: `R$ ${yearlyPrice} por ano`,
-            rowId: 'anual'
-          }
-        ]
-      }]
-    );
   }
 
   async sendWelcomeMessage(number, userName) {

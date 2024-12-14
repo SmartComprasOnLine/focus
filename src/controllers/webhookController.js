@@ -177,6 +177,14 @@ class WebhookController {
       }
 
       if (messageType && messageContent) {
+        // Store user interaction first
+        user.interactionHistory.push({
+          type: messageType,
+          content: messageContent,
+          role: 'user'
+        });
+        logMessage('info', 'User interaction stored:', user.interactionHistory);
+
         // Check for plan selection
         const planMatch = messageContent.toLowerCase().match(/plano_(mensal|anual)/);
         if (planMatch) {
@@ -211,12 +219,47 @@ class WebhookController {
           }
         }
 
-        user.interactionHistory.push({
-          type: messageType,
-          content: messageContent,
-          role: 'user'
-        });
-        logMessage('info', 'User interaction stored:', user.interactionHistory);
+        // Analyze user intent
+        const intentService = require('../services/intentService');
+        const intent = await intentService.analyzeIntent(messageContent, userName);
+        logMessage('info', 'Detected intent:', intent);
+
+        if (intent !== 'NONE') {
+          const monthlyPrice = (process.env.PLAN_MONTHLY_PRICE / 100).toFixed(2);
+          const yearlyPrice = (process.env.PLAN_YEARLY_PRICE / 100).toFixed(2);
+          
+          const response = await intentService.getResponseForIntent(intent, {
+            userName,
+            monthlyPrice,
+            yearlyPrice,
+            planType: user.subscription?.plan,
+            endDate: user.subscription?.endDate ? 
+              timezoneService.formatDateOnly(user.subscription.endDate) : 
+              null
+          });
+
+          if (response) {
+            if (response.type === 'list') {
+              await evolutionApi.sendList(
+                whatsappNumber,
+                response.title,
+                response.description,
+                response.buttonText,
+                response.sections
+              );
+            } else {
+              await evolutionApi.sendText(whatsappNumber, response.content);
+            }
+
+            user.interactionHistory.push({
+              type: response.type,
+              content: response.type === 'list' ? response.description : response.content,
+              role: 'assistant'
+            });
+            await user.save();
+            return res.status(200).json({ message: 'Intent response sent' });
+          }
+        }
       }
 
       logMessage('info', 'Processing message by type:', messageType);

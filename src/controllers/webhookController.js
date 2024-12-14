@@ -104,16 +104,29 @@ class WebhookController {
         return res.status(200).json({ message: 'Subscription required message sent' });
       }
 
-      // Store interaction in history with role
-      console.log('Storing interaction in history');
+      // Store user interaction in history
       if (messageType && messageContent) {
         user.interactionHistory.push({
           type: messageType,
           content: messageContent,
-          role: 'user'  // Set role for user interactions
+          role: 'user'
         });
-      } else {
-        console.error('Failed to store interaction: Missing type or content');
+        console.log('User interaction stored:', user.interactionHistory);
+      }
+
+      // Process message based on type
+      console.log('Processing message by type:', messageType);
+      if (messageType === 'text') {
+        console.log('Handling text message');
+        const response = await this.handleTextMessage(user, messageContent);
+        
+        // Store assistant response in history
+        user.interactionHistory.push({
+          type: 'text',
+          content: response,
+          role: 'assistant'
+        });
+        console.log('Assistant response stored:', user.interactionHistory);
       }
 
       // Log the message type for debugging

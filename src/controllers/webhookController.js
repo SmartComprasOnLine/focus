@@ -27,12 +27,10 @@ class WebhookController {
           return res.status(404).json({ error: 'User not found' });
         }
 
-        const subscriptionEnd = new Date();
-        if (planType === 'mensal') {
-          subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 1);
-        } else if (planType === 'anual') {
-          subscriptionEnd.setFullYear(subscriptionEnd.getFullYear() + 1);
-        }
+          const timezoneService = require('../services/timezoneService');
+          const subscriptionEnd = planType === 'mensal' 
+            ? timezoneService.addMonths(timezoneService.getCurrentTime(), 1)
+            : timezoneService.addYears(timezoneService.getCurrentTime(), 1);
 
         user.subscription = {
           status: 'ativa',
@@ -118,9 +116,10 @@ class WebhookController {
         trialEndDate: user.subscription.trialEndDate
       });
 
-      const now = new Date();
-      const trialEndDate = new Date(user.subscription.trialEndDate);
-      const daysRemaining = Math.ceil((trialEndDate - now) / (1000 * 60 * 60 * 24));
+      const timezoneService = require('../services/timezoneService');
+      const now = timezoneService.getCurrentTime();
+      const trialEndDate = timezoneService.endOfDay(user.subscription.trialEndDate);
+      const daysRemaining = timezoneService.getDaysBetween(now, trialEndDate);
 
       const monthlyPrice = (process.env.PLAN_MONTHLY_PRICE / 100).toFixed(2);
       const yearlyPrice = (process.env.PLAN_YEARLY_PRICE / 100).toFixed(2);

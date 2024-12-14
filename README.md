@@ -1,148 +1,136 @@
-# Focus - ADHD Coach WhatsApp Bot
+# Focus - TDAH Coach
 
-A MicroSaaS system integrated with Evolution API for WhatsApp, designed to help people with ADHD organize their routines. The system acts as a personal coach, helping users improve their productivity, focus, and disposition.
+Um sistema MicroSaaS integrado à Evolution API para WhatsApp, focado em ajudar pessoas com TDAH a organizarem suas rotinas. O sistema atua como um coach pessoal, auxiliando o usuário a melhorar sua produtividade, foco e disposição.
 
-## Features
+## Funcionalidades
 
-- WhatsApp message processing (text, audio, and image)
-- Automated messaging and notifications
-- Personalized plan generation based on user profile
-- Dynamic plan adjustments by AI coach
-- Subscription management with Stripe integration
-- 7-day free trial period
+### 1. Gerenciamento de Webhook
+- Processamento de eventos da Evolution API (mensagens de texto, áudio e imagem)
+- Respostas personalizadas baseadas no tipo de mensagem
+- Armazenamento de interações no banco de dados
 
-## Tech Stack
+### 2. Período de Teste Gratuito
+- 7 dias de teste gratuito
+- Registro automático de novos usuários
+- Notificação de término do período de teste
+- Transição suave para assinatura paga
+
+### 3. Gestão de Assinaturas
+- Integração com Stripe para processamento de pagamentos
+- Planos disponíveis:
+  - Mensal: R$ 99,00
+  - Anual: R$ 999,00 (economia de 2 meses)
+- Gerenciamento automático de status de assinatura
+- Webhook para confirmação de pagamentos
+
+### 4. Coach Pessoal
+- Interação personalizada baseada em IA
+- Geração de planos personalizados
+- Ajustes dinâmicos no plano
+- Sistema de notificações e lembretes
+
+## Tecnologias
 
 - Node.js
-- Express.js
 - MongoDB
-- OpenAI GPT-4
 - Evolution API (WhatsApp)
-- Stripe (Payments)
+- OpenAI GPT
+- Stripe
 
-## Prerequisites
+## Configuração
 
-- Node.js >= 18.0.0
-- MongoDB
-- Evolution API instance
-- OpenAI API key
-- Stripe account
+1. Clone o repositório:
+```bash
+git clone https://github.com/SmartComprasOnLine/focus.git
+cd focus
+```
 
-## Environment Variables
+2. Instale as dependências:
+```bash
+npm install
+```
 
-Create a `.env` file in the root directory with the following variables:
+3. Configure as variáveis de ambiente:
+```bash
+cp .env.example .env
+```
 
-\`\`\`env
-# Server Configuration
-PORT=3000
-NODE_ENV=development
-
-# MongoDB Configuration
+Edite o arquivo `.env` com suas configurações:
+```env
+# MongoDB
 MONGODB_URI=mongodb://localhost:27017/focus_adhd
 
-# Evolution API Configuration
+# Evolution API
 EVOLUTION_API_URL=https://evo.meuchatinteligente.com.br
 EVOLUTION_API_KEY=your_api_key
 EVOLUTION_INSTANCE=your_instance
 
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
+# OpenAI
+OPENAI_API_KEY=your_openai_key
 
-# Stripe Configuration
+# Stripe
 STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
 
-# Subscription Plans (in cents)
+# Planos (em centavos)
 PLAN_MONTHLY_PRICE=9900
 PLAN_YEARLY_PRICE=99900
-\`\`\`
+```
 
-## Installation
-
-1. Clone the repository:
-   \`\`\`bash
-   git clone https://github.com/yourusername/focus.git
-   cd focus
-   \`\`\`
-
-2. Install dependencies:
-   \`\`\`bash
-   npm install
-   \`\`\`
-
-3. Start the development server:
-   \`\`\`bash
-   npm run dev
-   \`\`\`
-
-## API Endpoints
-
-### Webhook Endpoints
-- POST `/api/webhook/whatsapp` - WhatsApp webhook endpoint
-- POST `/api/webhook/stripe` - Stripe webhook endpoint
-
-### Subscription Endpoints
-- POST `/api/subscription/create-checkout` - Create Stripe checkout session
-
-### Health Check
-- GET `/api/health` - Service health check
-
-## WhatsApp Message Types Supported
-
-1. Text Messages
-   - User queries
-   - Coach responses
-   - System notifications
-
-2. Audio Messages (Future Support)
-   - Voice notes
-   - Audio instructions
-
-3. Image Messages (Future Support)
-   - Visual aids
-   - Progress tracking
-
-## Subscription Plans
-
-1. Free Trial
-   - 7-day trial period
-   - Full access to features
-   - Automatic reminders before expiration
-
-2. Paid Plans
-   - Monthly subscription
-   - Annual subscription (discounted)
-   - Full access to all features
-
-## Development
-
-Start the development server with hot reload:
-\`\`\`bash
-npm run dev
-\`\`\`
-
-## Production
-
-Start the production server:
-\`\`\`bash
+4. Inicie o servidor:
+```bash
 npm start
-\`\`\`
+```
 
-## Testing
+## Scripts Úteis
 
-Run tests:
-\`\`\`bash
-npm test
-\`\`\`
+- `npm run dev`: Inicia o servidor em modo desenvolvimento
+- `node src/scripts/checkTrialEnding.js`: Verifica usuários com trial próximo do fim
+- `node src/scripts/checkUserSubscription.js`: Verifica status de assinatura
+- `node clearDatabase.js`: Limpa o banco de dados (apenas desenvolvimento)
 
-## Contributing
+## Estrutura do Projeto
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
+```
+src/
+├── controllers/        # Controladores da aplicação
+├── models/            # Modelos do MongoDB
+├── routes/            # Rotas da API
+├── scripts/           # Scripts utilitários
+├── services/          # Serviços (Evolution API, Stripe, etc)
+└── utils/             # Funções utilitárias
+```
 
-## License
+## Fluxo do Usuário
 
-This project is licensed under the ISC License.
+1. **Primeira Interação**
+   - Mensagem de boas-vindas
+   - Registro no banco de dados
+   - Início do período de teste
+
+2. **Durante o Teste**
+   - Coleta de dados
+   - Geração de plano personalizado
+   - Envio de notificações
+
+3. **Fim do Teste**
+   - Notificação de término
+   - Opções de assinatura
+   - Processo de pagamento
+
+4. **Assinatura Ativa**
+   - Acesso contínuo
+   - Suporte do coach
+   - Ajustes no plano
+
+## Contribuição
+
+1. Faça um Fork do projeto
+2. Crie uma Branch para sua Feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a Branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.

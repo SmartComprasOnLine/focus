@@ -26,6 +26,14 @@ class WebhookController {
       const messageType = data.messageType === 'conversation' ? 'text' : data.messageType || 'text';
       const userName = data.pushName || 'Novo Usuário';
 
+      // Log extracted values for debugging
+      console.log('Extracted values:', {
+        whatsappNumber,
+        messageContent,
+        messageType,
+        userName
+      });
+      
       console.log('Processed message:', {
         whatsappNumber,
         messageContent,
@@ -70,13 +78,14 @@ class WebhookController {
         return res.status(200).json({ message: 'Welcome message sent' });
       }
 
-      // Update user name if different
+      // Update user name if different and save user
       if (user.name !== userName && userName !== 'Novo Usuário') {
         console.log('Updating user name:', {
           old: user.name,
           new: userName
         });
         user.name = userName;
+        await user.save(); // Ensure user is saved after name update
       }
 
       // Check access
@@ -107,7 +116,8 @@ class WebhookController {
         console.error('Failed to store interaction: Missing type or content');
       }
 
-      // Process message based on type
+      // Log the message type for debugging
+      console.log('Message type:', messageType);
       console.log('Processing message by type:', messageType);
       if (messageType === 'text') {
         console.log('Handling text message');
@@ -147,9 +157,19 @@ class WebhookController {
 
   async handleTextMessage(user, messageContent) {
     console.log('Processing text message:', messageContent);
+    let automatedResponse;
+
+    console.log('Received message content for processing:', messageContent);
+    
+    if (messageContent.toLowerCase() === 'oi') {
+      automatedResponse = '👋 Olá! Como posso ajudar você hoje?';
+    } else {
+      automatedResponse = `Você disse: ${messageContent}`;
+    }
+
     await evolutionApi.sendText(
       user.whatsappNumber,
-      `Você disse: ${messageContent}`
+      automatedResponse
     );
   }
 

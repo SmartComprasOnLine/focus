@@ -170,20 +170,37 @@ class WebhookController {
 
   async handleTextMessage(user, messageContent) {
     console.log('Processing text message:', messageContent);
-    let automatedResponse;
-
-    console.log('Received message content for processing:', messageContent);
-    
-    if (messageContent.toLowerCase() === 'oi') {
-      automatedResponse = '👋 Olá! Como posso ajudar você hoje?';
-    } else {
-      automatedResponse = `Você disse: ${messageContent}`;
-    }
-
-    await evolutionApi.sendText(
-      user.whatsappNumber,
-      automatedResponse
+    // Chamar a função de geração de resposta da IA
+    const response = await openaiService.generateCoachResponse(
+        user.name,
+        messageContent,
+        user.currentPlan, // Supondo que você tenha o plano atual do usuário
+        user.interactionHistory
     );
+
+    // Enviar a resposta gerada ao usuário
+    await evolutionApi.sendText(
+        user.whatsappNumber,
+        response
+    );
+
+    // Armazenar a resposta do assistente no histórico
+    user.interactionHistory.push({
+        type: 'text',
+        content: response,
+        role: 'assistant'
+    });
+    console.log('Assistant response stored:', user.interactionHistory);
+
+     // Remover a chamada redundante
+
+    // Store assistant response in history
+    user.interactionHistory.push({
+      type: 'text',
+      content: automatedResponse,
+      role: 'assistant'
+    });
+    console.log('Assistant response stored:', user.interactionHistory);
   }
 
   async handleAudioMessage(user, messageContent) {

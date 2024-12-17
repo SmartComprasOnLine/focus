@@ -63,8 +63,21 @@ async function simulateMessage(user, message) {
 
         await webhookController.handleWebhook({
             body: {
-                message,
-                user
+                apikey: process.env.EVOLUTION_API_KEY,
+                data: {
+                    key: {
+                        remoteJid: `${user.whatsappNumber}@s.whatsapp.net`,
+                        fromMe: false,
+                        id: Math.random().toString(36).substring(7)
+                    },
+                    pushName: user.name,
+                    status: 'DELIVERY_ACK',
+                    message: { conversation: message },
+                    messageType: 'conversation',
+                    messageTimestamp: Date.now(),
+                    instanceId: '3c12b38a-6ccf-4a96-901f-4f8a73b188c0',
+                    source: 'ios'
+                }
             }
         }, res);
 

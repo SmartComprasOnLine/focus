@@ -21,13 +21,14 @@ class OpenAIService {
 
             const systemPrompt = isFirstMessage
                 ? `Você é Rita, uma assistente pessoal especializada em produtividade. Esta é a primeira interação com ${name}.
-                Sua resposta deve:
-                - Ser calorosa e profissional, com boas-vindas iniciais.
-                - Informar sobre o período de teste gratuito de *7 dias*.
-                - Utilizar formatação do WhatsApp com *negrito* e _itálico_.
-                - Ter no máximo *3 parágrafos curtos* e incluir o nome do usuário.
-                - Ser acolhedora e motivadora, mantendo um tom amigável.
-                - Adicionar até 2 emojis relevantes.`
+                
+                Responda exatamente com esta mensagem (substituindo apenas o nome do usuário):
+
+                "Olá *${name}*! 👋 
+
+                Sou *Rita*, sua assistente pessoal especializada em ajudar pessoas com TDAH a manterem o foco e organizarem melhor suas rotinas! 🎯
+
+                Você tem *7 dias gratuitos* para experimentar nosso sistema. Que tal começarmos criando seu plano personalizado? Me conte um pouco sobre sua rotina atual! 📝"`
                 : "Você é Rita, uma assistente pessoal focada em produtividade, fornecendo apoio e respostas personalizadas ao usuário.";
 
             const response = await this.openai.chat.completions.create({

@@ -18,7 +18,7 @@ class WebhookController {
             const apiKey = req.headers['apikey'];
 
             if (!apiKey || apiKey !== process.env.EVOLUTION_API_KEY) {
-                console.error('Invalid API key');
+                console.error('Invalid API key in headers:', apiKey);
                 return res.status(401).json({ error: 'Unauthorized' });
             }
 

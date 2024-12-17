@@ -15,7 +15,7 @@ class EvolutionApi {
             baseURL: this.baseURL,
             headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': this.apiKey
+                'apikey': this.apiKey
             }
         });
     }
@@ -26,26 +26,10 @@ class EvolutionApi {
             console.log('Current instance:', this.instance);
             console.log('Current baseURL:', this.baseURL);
             console.log('Request URL:', `/message/sendText/${this.instance}`);
-            console.log('Request body:', {
-                number,
-                options: {
-                    delay: 1000,
-                    presence: 'composing'
-                },
-                textMessage: {
-                    text
-                }
-            });
 
             const response = await this.api.post(`/message/sendText/${this.instance}`, {
                 number: number,
-                options: {
-                    delay: 1000,
-                    presence: 'composing'
-                },
-                textMessage: {
-                    text
-                }
+                text: text
             });
 
             console.log('Response:', response.data);
@@ -57,7 +41,18 @@ class EvolutionApi {
 
             return response;
         } catch (error) {
-            console.error('Error sending text message:', error.response?.data || error.message);
+            console.error('Error sending text message:', {
+                error: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                headers: error.response?.headers,
+                config: {
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    headers: error.config?.headers,
+                    data: error.config?.data
+                }
+            });
             throw error;
         }
     }
@@ -70,32 +65,119 @@ class EvolutionApi {
                 description,
                 buttonText,
                 sections,
-                footerText,
-                delay
+                footerText
             });
 
             const response = await this.api.post(`/message/sendList/${this.instance}`, {
                 number: number,
-                options: {
-                    delay,
-                    presence: 'composing'
-                },
-                listMessage: {
-                    title,
-                    description,
-                    buttonText,
-                    sections,
-                    footerText
-                }
+                title,
+                description,
+                buttonText,
+                sections,
+                footerText
             });
 
+            console.log('Response:', response.data);
+
             if (!response.data || response.data.error) {
+                console.error('Error response:', response.data);
                 throw new Error(response.data?.error || 'Failed to send list message');
             }
 
             return response;
         } catch (error) {
-            console.error('Error sending list message:', error.response?.data || error.message);
+            console.error('Error sending list message:', {
+                error: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                headers: error.response?.headers,
+                config: {
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    headers: error.config?.headers,
+                    data: error.config?.data
+                }
+            });
+            throw error;
+        }
+    }
+
+    async sendMedia(number, mediatype, mimetype, caption, media) {
+        try {
+            console.log('Sending media with data:', {
+                number,
+                mediatype,
+                mimetype,
+                caption,
+                media
+            });
+
+            const response = await this.api.post(`/message/sendMedia/${this.instance}`, {
+                number: number,
+                mediatype,
+                mimetype,
+                caption,
+                media
+            });
+
+            console.log('Response:', response.data);
+
+            if (!response.data || response.data.error) {
+                console.error('Error response:', response.data);
+                throw new Error(response.data?.error || 'Failed to send media message');
+            }
+
+            return response;
+        } catch (error) {
+            console.error('Error sending media message:', {
+                error: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                headers: error.response?.headers,
+                config: {
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    headers: error.config?.headers,
+                    data: error.config?.data
+                }
+            });
+            throw error;
+        }
+    }
+
+    async sendAudio(number, audio) {
+        try {
+            console.log('Sending audio with data:', {
+                number,
+                audio
+            });
+
+            const response = await this.api.post(`/message/sendWhatsAppAudio/${this.instance}`, {
+                number: number,
+                audio
+            });
+
+            console.log('Response:', response.data);
+
+            if (!response.data || response.data.error) {
+                console.error('Error response:', response.data);
+                throw new Error(response.data?.error || 'Failed to send audio message');
+            }
+
+            return response;
+        } catch (error) {
+            console.error('Error sending audio message:', {
+                error: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                headers: error.response?.headers,
+                config: {
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    headers: error.config?.headers,
+                    data: error.config?.data
+                }
+            });
             throw error;
         }
     }

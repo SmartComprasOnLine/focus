@@ -69,6 +69,56 @@ class RoutineController {
     }
   }
 
+  async updatePlan(user, message) {
+    try {
+      // Find user's current routine
+      const routine = await Routine.findOne({ userId: user._id });
+
+      if (!routine) {
+        await evolutionApi.sendText(
+          user.whatsappNumber,
+          '*Você ainda não tem um plano criado.* 📝\n\n_Que tal me contar um pouco sobre sua rotina para eu criar um plano personalizado?_ 😊'
+        );
+        return;
+      }
+
+      // Analyze the update request
+      const updateInfo = await intentService.analyzePlanUpdate(message, routine);
+      console.log('Update info:', updateInfo);
+
+      // Update the routine based on the analysis
+      if (updateInfo.type === 'modify') {
+        updateInfo.activities.forEach(activityUpdate => {
+          const activity = routine.activities.find(a => 
+            a.activity === activityUpdate.id || 
+            (a.scheduledTime === activityUpdate.time && a.activity === activityUpdate.task)
+          );
+
+          if (activity) {
+            if (activityUpdate.changes.field === 'time') {
+              activity.scheduledTime = activityUpdate.changes.to;
+            } else if (activityUpdate.changes.field === 'duration') {
+              activity.duration = parseInt(activityUpdate.changes.to);
+            }
+          }
+        });
+      }
+
+      await routine.save();
+
+      // Send confirmation message
+      const confirmMessage = `*Plano atualizado com sucesso!* ✅\n\nVou te mostrar como ficou:`;
+      await evolutionApi.sendText(user.whatsappNumber, confirmMessage);
+      
+      // Show updated plan
+      await this.getPlanSummary(user);
+
+    } catch (error) {
+      console.error('Error updating plan:', error);
+      throw error;
+    }
+  }
+
   async updatePlanProgress(user, completedTasks, feedback) {
     try {
       // Analyze progress and generate adjustments

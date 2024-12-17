@@ -28,7 +28,7 @@ class EvolutionApi {
             console.log('Request URL:', `/message/sendText/${this.instance}`);
 
             const response = await this.api.post(`/message/sendText/${this.instance}`, {
-                number: `${number}@s.whatsapp.net`,
+                number: number,
                 options: {
                     delay: 1000,
                     presence: 'composing'
@@ -62,7 +62,7 @@ class EvolutionApi {
             });
 
             const response = await this.api.post(`/message/sendList/${this.instance}`, {
-                number: `${number}@s.whatsapp.net`,
+                number: number,
                 options: {
                     delay,
                     presence: 'composing'

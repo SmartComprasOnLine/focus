@@ -14,10 +14,14 @@ class WebhookController {
 
     async handleWebhook(req, res) {
         try {
-            // Validate API key
-            const apiKey = req.body.apikey;
+            // Validate API key from headers or query params
+            const apiKey = req.headers['x-api-key'] || req.query.apikey || req.body.apikey;
             if (!apiKey || apiKey !== process.env.EVOLUTION_API_KEY) {
-                console.error('Invalid API key');
+                console.error('Invalid API key:', { 
+                    headers: req.headers['x-api-key'],
+                    query: req.query.apikey,
+                    body: req.body.apikey 
+                });
                 return res.status(401).json({ error: 'Unauthorized' });
             }
 

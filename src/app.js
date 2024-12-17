@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const connectDB = require('./config/database');
+const { connectDB } = require('./config/database');
 const routes = require('./routes');
 
 // Initialize express app
@@ -11,11 +11,6 @@ const app = express();
 
 // Connect to MongoDB
 connectDB();
-
-// Middleware
-app.use(helmet()); // Security headers
-app.use(morgan('dev')); // Logging
-app.use(cors()); // CORS support
 
 // Body parser middleware - except for Stripe webhook route
 app.use((req, res, next) => {
@@ -25,6 +20,11 @@ app.use((req, res, next) => {
     express.json()(req, res, next);
   }
 });
+
+// Other middleware
+app.use(helmet()); // Security headers
+app.use(morgan('dev')); // Logging
+app.use(cors()); // CORS support
 
 // Routes
 app.use('/', routes);

@@ -5,57 +5,57 @@ const reminderService = require('../services/reminderService');
 const timezoneService = require('../services/timezoneService');
 
 class RoutineController {
-  async createInitialPlan(user, userResponses) {
+  async createInitialPlan(user, { initialMessage }) {
     try {
-      // Gerar plano personalizado e lembretes usando OpenAI
-      const { plan, reminders } = await openaiService.generateInitialPlan(user.name, userResponses);
+      // Generate personalized plan using OpenAI
+      const plan = await openaiService.generateInitialPlan(user.name, initialMessage);
 
-      console.log('Generated reminders:', JSON.stringify(reminders, null, 2));
+      console.log('Generated plan:', JSON.stringify(plan, null, 2));
 
-      // Converter os lembretes em atividades
-      const activities = reminders.map(reminder => {
-        const scheduledTime = timezoneService.getScheduledTime(reminder.scheduledTime);
-        console.log(`Converting time ${reminder.scheduledTime} to ${timezoneService.formatDate(scheduledTime)}`);
+      // Convert activities to reminders
+      const activities = plan.activities.map(activity => {
+        const scheduledTime = activity.time;
+        console.log(`Processing activity at ${scheduledTime}: ${activity.task}`);
         
         return {
-          activity: reminder.activity,
+          activity: activity.task,
           scheduledTime: scheduledTime,
-          type: reminder.type || 'geral',
+          type: 'routine',
           status: 'active',
-          messages: reminder.messages || {
-            before: `⏰ Em 5 minutos: ${reminder.activity}`,
-            start: `🎯 Hora de ${reminder.activity}`,
-            during: `💪 Continue focado em ${reminder.activity}`,
-            after: `✅ Como foi ${reminder.activity}?`
-          }
+          duration: activity.duration,
+          messages: activity.reminders
         };
       });
 
       console.log('Converted activities:', JSON.stringify(activities.map(a => ({
         activity: a.activity,
-        scheduledTime: timezoneService.formatDate(a.scheduledTime),
-        type: a.type
+        scheduledTime: a.scheduledTime,
+        type: a.type,
+        duration: a.duration
       })), null, 2));
 
-      // Criar nova rotina no banco de dados
+      // Create new routine in database
       const routine = await Routine.create({
         userId: user._id,
         routineName: 'Plano Inicial',
         activities: activities
       });
 
-      // Atualizar o usuário com o plano atual
-      user.currentPlan = routine._id;
+      // Update user with current plan
+      user.activeRoutineId = routine._id;
       await user.save();
 
-      // Configurar lembretes
+      // Setup reminders
       await reminderService.setupReminders(user, routine);
 
-      // Enviar plano para o usuário
+      // Send plan to user
       await evolutionApi.sendText(
         user.whatsappNumber,
-        `Ótimo! Criei um plano personalizado para você:\n\n${plan}\n\n` +
-        'Configurei lembretes para ajudar você a seguir o plano. Você receberá notificações nos horários programados.\n\n' +
+        `Ótimo! Criei um plano personalizado para você:\n\n` +
+        plan.activities.map(a => 
+          `${a.time} - ${a.task} (${a.duration} minutos)`
+        ).join('\n') +
+        '\n\nConfigurei lembretes para ajudar você a seguir o plano. Você receberá notificações nos horários programados.\n\n' +
         'Vamos começar? Responda "sim" para confirmar ou me diga se precisar de ajustes. 😊'
       );
 
@@ -68,17 +68,17 @@ class RoutineController {
 
   async updatePlanProgress(user, completedTasks, feedback) {
     try {
-      // Analisar progresso e gerar ajustes
+      // Analyze progress and generate adjustments
       const analysis = await openaiService.analyzePlanProgress(
         user.currentPlan,
         completedTasks,
         feedback
       );
 
-      // Atualizar rotina no banco de dados
+      // Update routine in database
       const routine = await Routine.findOne({ userId: user._id });
       if (routine) {
-        // Atualizar status das atividades completadas
+        // Update status of completed activities
         completedTasks.forEach(taskId => {
           const activity = routine.activities.id(taskId);
           if (activity) {
@@ -89,7 +89,7 @@ class RoutineController {
         await routine.save();
       }
 
-      // Enviar análise para o usuário
+      // Send analysis to user
       await evolutionApi.sendText(
         user.whatsappNumber,
         `Análise do seu progresso:\n\n${analysis}`

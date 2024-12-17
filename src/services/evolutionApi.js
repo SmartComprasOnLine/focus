@@ -22,20 +22,33 @@ class EvolutionApi {
 
     async sendText(number, text) {
         try {
-            console.log('SendText called with:', { number, text });
-            console.log('Current instance:', this.instance);
-            console.log('Current baseURL:', this.baseURL);
-            console.log('Request URL:', `/message/sendText/${this.instance}`);
+            console.log('\n=== Evolution API Request ===');
+            console.log('Method: POST');
+            console.log('URL:', `${this.baseURL}/message/sendText/${this.instance}`);
+            console.log('Headers:', {
+                'Content-Type': 'application/json',
+                'apikey': this.apiKey
+            });
+            console.log('Body:', {
+                number,
+                text
+            });
 
             const response = await this.api.post(`/message/sendText/${this.instance}`, {
                 number: number,
                 text: text
             });
 
-            console.log('Response:', response.data);
+            console.log('\n=== Evolution API Response ===');
+            console.log('Status:', response.status);
+            console.log('Headers:', response.headers);
+            console.log('Data:', response.data);
             
             if (!response.data || response.data.error) {
-                console.error('Error response:', response.data);
+                console.error('\n=== Evolution API Error ===');
+                console.error('Status:', response.status);
+                console.error('Headers:', response.headers);
+                console.error('Data:', response.data);
                 throw new Error(response.data?.error || 'Failed to send message');
             }
 

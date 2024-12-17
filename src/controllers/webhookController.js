@@ -14,19 +14,21 @@ class WebhookController {
 
     async handleWebhook(req, res) {
         try {
-            const { message, number } = req.body;
-
-            // Validate required fields
-            if (!message || !number) {
+            // Validate webhook data
+            if (!req.body.data || !req.body.data.message || !req.body.data.key) {
                 console.error('Invalid webhook data:', req.body);
                 return res.status(400).json({ error: 'Missing required fields' });
             }
 
+            // Extract message and number
+            const messageData = req.body.data;
+            const number = messageData.key.remoteJid.split('@')[0];
+            const message = messageData.message.conversation;
+            const name = messageData.pushName || `User ${number.slice(-4)}`;
+
             // Find or create user
             let user = await User.findOne({ whatsappNumber: number });
             if (!user) {
-                // Extract name from number (temporary until we get proper user data)
-                const name = `User ${number.slice(-4)}`;
                 user = await User.create({
                     name,
                     whatsappNumber: number,

@@ -9,15 +9,13 @@ class EvolutionApi {
         if (!this.instance || !this.baseURL || !this.apiKey) {
             throw new Error('Missing required Evolution API configuration');
         }
+    }
 
-        // Initialize axios instance
-        this.api = axios.create({
-            baseURL: this.baseURL,
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': this.apiKey
-            }
-        });
+    formatNumber(number) {
+        // Remove any non-digit characters
+        const cleaned = number.replace(/\D/g, '');
+        // Add country code if not present
+        return cleaned.startsWith('55') ? cleaned : `55${cleaned}`;
     }
 
     async sendText(number, text) {
@@ -34,7 +32,6 @@ class EvolutionApi {
                 text
             });
 
-            // Make the actual API call
             const response = await axios({
                 method: 'post',
                 url: `${this.baseURL}/message/sendText/${this.instance}`,
@@ -43,8 +40,8 @@ class EvolutionApi {
                     'apikey': this.apiKey
                 },
                 data: {
-                    number,
-                    text
+                    number: number,
+                    text: text
                 }
             });
 
@@ -82,6 +79,15 @@ class EvolutionApi {
 
     async sendList(number, title, description, buttonText, sections, footerText) {
         try {
+            const data = {
+                number: number,
+                title: title,
+                description: description,
+                buttonText: buttonText,
+                sections: sections,
+                footerText: footerText
+            };
+
             console.log('\n=== Evolution API Request ===');
             console.log('Method: POST');
             console.log('URL:', `${this.baseURL}/message/sendList/${this.instance}`);
@@ -89,16 +95,8 @@ class EvolutionApi {
                 'Content-Type': 'application/json',
                 'apikey': this.apiKey
             });
-            console.log('Body:', {
-                number,
-                title,
-                description,
-                buttonText,
-                sections,
-                footerText
-            });
+            console.log('Body:', data);
 
-            // Make the actual API call
             const response = await axios({
                 method: 'post',
                 url: `${this.baseURL}/message/sendList/${this.instance}`,
@@ -106,14 +104,7 @@ class EvolutionApi {
                     'Content-Type': 'application/json',
                     'apikey': this.apiKey
                 },
-                data: {
-                    number,
-                    title,
-                    description,
-                    buttonText,
-                    sections,
-                    footerText
-                }
+                data: data
             });
 
             console.log('\n=== Evolution API Response ===');

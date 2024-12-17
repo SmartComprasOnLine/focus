@@ -61,6 +61,9 @@ class WebhookController {
 
             const userId = user._id.toString();
 
+            // Add user message to history
+            await user.addToMessageHistory('user', message);
+
             // Clear any existing timeout for this user
             if (this.messageTimeouts.has(userId)) {
                 clearTimeout(this.messageTimeouts.get(userId));
@@ -84,9 +87,9 @@ class WebhookController {
                     await this.processMessages(messages.join('\n'), user);
                 } catch (error) {
                     console.error('Error processing messages:', error);
-                    await evolutionApi.sendText(user.whatsappNumber,
-                        'Desculpe, tive um problema ao processar sua mensagem. Por favor, tente novamente.'
-                    );
+                    const errorMessage = 'Desculpe, tive um problema ao processar sua mensagem. Por favor, tente novamente.';
+                    await evolutionApi.sendText(user.whatsappNumber, errorMessage);
+                    await user.addToMessageHistory('assistant', errorMessage);
                 }
             }, 10000); // 10 seconds
 
@@ -104,15 +107,16 @@ class WebhookController {
         try {
             // For new users, send welcome message immediately
             if (!user.welcomeSent) {
-                await evolutionApi.sendText(user.whatsappNumber,
-                    `Olá ${user.name}! 👋\n\n` +
-                    'Bem-vindo ao Focus, seu assistente pessoal para TDAH! 🌟\n\n' +
-                    'Estou aqui para te ajudar a:\n' +
+                const welcomeMessage = `*Olá ${user.name}!* 👋\n\n` +
+                    '*Bem-vindo ao Focus, seu assistente pessoal para TDAH!* 🌟\n\n' +
+                    '*Estou aqui para te ajudar a:*\n' +
                     '• Criar e manter rotinas 📅\n' +
                     '• Gerenciar tarefas e lembretes ⏰\n' +
                     '• Melhorar seu foco e produtividade 🎯\n\n' +
-                    'Me conte um pouco sobre sua rotina atual para começarmos! 💪'
-                );
+                    '_Me conte um pouco sobre sua rotina atual para começarmos!_ 💪';
+                
+                await evolutionApi.sendText(user.whatsappNumber, welcomeMessage);
+                await user.addToMessageHistory('assistant', welcomeMessage);
                 
                 // Mark welcome message as sent
                 user.welcomeSent = true;
@@ -124,17 +128,22 @@ class WebhookController {
                 await user.save();
             }
 
+            // Get message history for context
+            const messageHistory = user.getMessageHistory();
+
             // Detect intent with user context
             const userContext = {
                 hasActivePlan: !!user.activeRoutineId,
                 subscriptionStatus: user.subscription.status,
-                preferences: user.preferences || {}
+                preferences: user.preferences || {},
+                messageHistory: messageHistory
             };
 
             try {
                 const intent = await intentService.detectIntent(message, userContext);
                 console.log('Detected intent:', intent);
 
+                let response;
                 switch (intent) {
                     case 'create_plan':
                         await routineController.createInitialPlan(user, { initialMessage: message });
@@ -183,31 +192,31 @@ class WebhookController {
                     }
 
                     case 'goodbye': {
-                        await evolutionApi.sendText(user.whatsappNumber,
-                            `Sempre à disposição ${user.name}! 😊 Continue focado nos seus objetivos! 💪`
-                        );
+                        const goodbyeMessage = `*Sempre à disposição ${user.name}!* 😊 _Continue focado nos seus objetivos!_ 💪`;
+                        await evolutionApi.sendText(user.whatsappNumber, goodbyeMessage);
+                        await user.addToMessageHistory('assistant', goodbyeMessage);
                         break;
                     }
 
                     default: {
                         // Generate contextual response
-                        const response = await openaiService.generateResponse(user.name, message);
+                        response = await openaiService.generateResponse(user.name, message, messageHistory);
                         await evolutionApi.sendText(user.whatsappNumber, response);
+                        await user.addToMessageHistory('assistant', response);
                         break;
                     }
                 }
             } catch (error) {
                 console.error('Error processing intent:', error);
-                await evolutionApi.sendText(user.whatsappNumber,
-                    'Desculpe, tive um problema ao processar sua mensagem. Por favor, tente novamente.'
-                );
+                const errorMessage = 'Desculpe, tive um problema ao processar sua mensagem. Por favor, tente novamente.';
+                await evolutionApi.sendText(user.whatsappNumber, errorMessage);
+                await user.addToMessageHistory('assistant', errorMessage);
             }
         } catch (error) {
             console.error('Error processing messages:', error);
-            // Send error message to user
-            await evolutionApi.sendText(user.whatsappNumber,
-                'Desculpe, tive um problema ao processar sua mensagem. Por favor, tente novamente.'
-            );
+            const errorMessage = 'Desculpe, tive um problema ao processar sua mensagem. Por favor, tente novamente.';
+            await evolutionApi.sendText(user.whatsappNumber, errorMessage);
+            await user.addToMessageHistory('assistant', errorMessage);
         }
     }
 }

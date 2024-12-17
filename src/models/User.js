@@ -1,5 +1,21 @@
 const mongoose = require('mongoose');
 
+const messageHistorySchema = new mongoose.Schema({
+    role: {
+        type: String,
+        enum: ['user', 'assistant'],
+        required: true
+    },
+    content: {
+        type: String,
+        required: true
+    },
+    timestamp: {
+        type: Date,
+        default: Date.now
+    }
+});
+
 const reminderPreferenceSchema = new mongoose.Schema({
     type: {
         type: String,
@@ -202,6 +218,7 @@ const userSchema = new mongoose.Schema({
     },
     preferences: preferencesSchema,
     planHistory: [planHistorySchema],
+    messageHistory: [messageHistorySchema],
     lastActive: {
         type: Date,
         default: Date.now
@@ -267,6 +284,22 @@ userSchema.methods.abandonPlan = async function(reason) {
 userSchema.methods.updatePreferences = async function(newPreferences) {
     Object.assign(this.preferences, newPreferences);
     await this.save();
+};
+
+userSchema.methods.addToMessageHistory = async function(role, content) {
+    // Keep only the last 10 messages
+    if (this.messageHistory.length >= 10) {
+        this.messageHistory.shift(); // Remove oldest message
+    }
+    this.messageHistory.push({ role, content });
+    await this.save();
+};
+
+userSchema.methods.getMessageHistory = function() {
+    return this.messageHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content
+    }));
 };
 
 module.exports = mongoose.model('User', userSchema);

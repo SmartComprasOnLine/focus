@@ -33,7 +33,7 @@ class WebhookController {
 
             // Extract message and number
             const messageData = req.body.data;
-            const number = messageData.key.remoteJid.split('@')[0];
+            const number = messageData.key.remoteJid.replace('@s.whatsapp.net', '');
             const message = messageData.message.conversation;
             const name = messageData.pushName || `User ${number.slice(-4)}`;
 

@@ -127,6 +127,38 @@ class RoutineController {
       throw error;
     }
   }
+
+  async getPlanSummary(user) {
+    try {
+      // Find user's current routine
+      const routine = await Routine.findOne({ userId: user._id });
+
+      if (!routine) {
+        await evolutionApi.sendText(
+          user.whatsappNumber,
+          'Você ainda não tem um plano criado. Que tal me contar um pouco sobre sua rotina para eu criar um plano personalizado? 😊'
+        );
+        return;
+      }
+
+      // Generate summary using OpenAI
+      const summary = await openaiService.generatePlanSummary(
+        user.name,
+        routine
+      );
+
+      // Send summary to user
+      await evolutionApi.sendText(
+        user.whatsappNumber,
+        `Aqui está o resumo do seu plano:\n\n${summary}\n\nPrecisa de algum ajuste? Me avise! 😊`
+      );
+
+      return routine;
+    } catch (error) {
+      console.error('Error getting plan summary:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new RoutineController();

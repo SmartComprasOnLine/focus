@@ -128,6 +128,20 @@ class WebhookController {
 
                 let response;
                 switch (intent) {
+                    case 'initial_message': {
+                        if (!user.welcomeSent) {
+                            response = await openaiService.generateResponse(user.name, message, messageHistory);
+                            await evolutionApi.sendText(user.whatsappNumber, response);
+                            await user.addToMessageHistory('assistant', response);
+                            user.welcomeSent = true;
+                            await user.save();
+                        } else {
+                            response = await openaiService.generateResponse(user.name, message, messageHistory);
+                            await evolutionApi.sendText(user.whatsappNumber, response);
+                            await user.addToMessageHistory('assistant', response);
+                        }
+                        break;
+                    }
                     case 'create_plan':
                         await routineController.createInitialPlan(user, { initialMessage: message });
                         break;

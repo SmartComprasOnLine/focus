@@ -26,6 +26,7 @@ class IntentService {
                         role: "system",
                         content: `You are Rita, a personal productivity assistant. 
                         Analyze the user message and return one of these intents:
+                        - initial_message: When this is the user's first interaction or they're saying hello/hi/starting a conversation
                         - create_plan: When user wants to create their initial routine plan
                         - update_plan: When user wants to modify their existing plan (add/remove/change activities or reminders)
                         - show_plan: When user wants to see their current plan or routine

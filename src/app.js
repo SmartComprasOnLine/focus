@@ -12,6 +12,15 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
+// CORS configuration
+const corsOptions = {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'apikey'],
+    exposedHeaders: ['apikey'],
+    credentials: true
+};
+
 // Body parser middleware - except for Stripe webhook route
 app.use((req, res, next) => {
   if (req.originalUrl === '/webhook/stripe') {
@@ -24,7 +33,7 @@ app.use((req, res, next) => {
 // Other middleware
 app.use(helmet()); // Security headers
 app.use(morgan('dev')); // Logging
-app.use(cors()); // CORS support
+app.use(cors(corsOptions)); // CORS support with custom options
 
 // Routes
 app.use('/', routes);

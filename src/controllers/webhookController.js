@@ -14,43 +14,8 @@ class WebhookController {
 
     async handleWebhook(req, res) {
         try {
-            // Extract API key from headers or body
-            const apiKey = req.headers['apikey'] || 
-                          req.headers['x-api-key'] || 
-                          (req.body && req.body.apikey);
-
-            // Convert API key to correct format if needed
-            const formattedApiKey = apiKey && apiKey.replace(/[^a-zA-Z0-9]/g, '');
-
-            console.log('API key details:', {
-                received: apiKey,
-                formatted: formattedApiKey,
-                expected: process.env.EVOLUTION_API_KEY,
-                matches: formattedApiKey === process.env.EVOLUTION_API_KEY
-            });
-
-            if (!formattedApiKey || formattedApiKey !== process.env.EVOLUTION_API_KEY) {
-                console.error('Invalid API key:', {
-                    received: apiKey,
-                    formatted: formattedApiKey,
-                    expected: process.env.EVOLUTION_API_KEY,
-                    headers: req.headers,
-                    body: typeof req.body === 'string' ? 'String body' : 'Parsed body'
-                });
-                return res.status(401).json({ error: 'Unauthorized' });
-            }
-
             // Parse body if it's a string
             const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-
-            // Log full request for debugging
-            console.log('Full request:', {
-                headers: req.headers,
-                body: body,
-                url: req.url,
-                method: req.method,
-                path: req.path
-            });
 
             // Validate webhook data
             if (!body.data || !body.data.message || !body.data.key) {

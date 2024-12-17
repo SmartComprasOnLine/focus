@@ -9,6 +9,9 @@ class EvolutionApi {
         if (!this.instance || !this.baseURL || !this.apiKey) {
             throw new Error('Missing required Evolution API configuration');
         }
+
+        // Format API key on initialization
+        this.apiKey = this.apiKey.replace(/[^a-zA-Z0-9]/g, '');
     }
 
     formatNumber(number) {
@@ -40,7 +43,7 @@ class EvolutionApi {
                     'apikey': this.apiKey
                 },
                 data: {
-                    number: number,
+                    number: this.formatNumber(number),
                     text: text
                 }
             });
@@ -80,7 +83,7 @@ class EvolutionApi {
     async sendList(number, title, description, buttonText, sections, footerText) {
         try {
             const data = {
-                number: number,
+                number: this.formatNumber(number),
                 title: title,
                 description: description,
                 buttonText: buttonText,

@@ -26,7 +26,22 @@ class WebhookController {
             // Extract message and number
             const messageData = body.data;
             const number = messageData.key.remoteJid.replace('@s.whatsapp.net', '');
-            const message = messageData.message.conversation;
+            
+            // Extract message text, handling different message structures
+            let message;
+            if (messageData.message.conversation) {
+                message = messageData.message.conversation;
+            } else if (messageData.message.extendedTextMessage) {
+                message = messageData.message.extendedTextMessage.text;
+            } else if (messageData.message.messageContextInfo && messageData.message.conversation) {
+                message = messageData.message.conversation;
+            } else {
+                console.error('Unknown message format:', messageData.message);
+                return res.status(400).json({ error: 'Unsupported message format' });
+            }
+
+            console.log('Extracted message:', message);
+
             const name = messageData.pushName || `User ${number.slice(-4)}`;
 
             // Find or create user

@@ -14,20 +14,24 @@ class WebhookController {
 
     async handleWebhook(req, res) {
         try {
-            // Extract API key from headers (case-insensitive)
+            // Extract API key from headers or body
             const apiKey = req.headers['apikey'] || 
-                          req.headers['Apikey'] || 
-                          req.headers['APIKey'] || 
-                          req.headers['APIKEY'] || 
-                          req.headers['api-key'] || 
-                          req.headers['Api-Key'] || 
-                          req.headers['API-KEY'];
+                          req.headers['x-api-key'] || 
+                          (req.body && req.body.apikey);
 
-            console.log('Headers received:', req.headers);
-            console.log('API key received:', apiKey);
+            console.log('API key sources:', {
+                headerApiKey: req.headers['apikey'],
+                headerXApiKey: req.headers['x-api-key'],
+                bodyApiKey: req.body && req.body.apikey
+            });
 
             if (!apiKey || apiKey !== process.env.EVOLUTION_API_KEY) {
-                console.error('Invalid API key:', apiKey);
+                console.error('Invalid API key:', {
+                    received: apiKey,
+                    expected: process.env.EVOLUTION_API_KEY,
+                    headers: req.headers,
+                    body: typeof req.body === 'string' ? 'String body' : 'Parsed body'
+                });
                 return res.status(401).json({ error: 'Unauthorized' });
             }
 
@@ -35,7 +39,13 @@ class WebhookController {
             const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
             // Log full request for debugging
-            console.log('Request body:', body);
+            console.log('Full request:', {
+                headers: req.headers,
+                body: body,
+                url: req.url,
+                method: req.method,
+                path: req.path
+            });
 
             // Validate webhook data
             if (!body.data || !body.data.message || !body.data.key) {

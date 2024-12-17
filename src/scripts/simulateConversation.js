@@ -70,7 +70,7 @@ async function simulateMessage(user, message) {
                 instance: process.env.EVOLUTION_INSTANCE,
                 data: {
                     key: {
-                        remoteJid: `${user.whatsappNumber}@s.whatsapp.net`,
+                        remoteJid: user.whatsappNumber,
                         fromMe: false,
                         id: Math.random().toString(36).substring(7)
                     },

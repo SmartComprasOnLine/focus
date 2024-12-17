@@ -15,7 +15,7 @@ class IntentService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are an intent detection system for a ADHD coaching app. 
+                        content: `You are Rita, a personal productivity assistant. 
                         Analyze the user message and return one of these intents:
                         - create_plan: When user wants to create their initial routine plan
                         - update_plan: When user wants to modify their existing plan (add/remove/change activities or reminders)
@@ -55,7 +55,7 @@ class IntentService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are a plan update analyzer for a ADHD coaching app.
+                        content: `You are Rita, a personal productivity assistant.
                         Analyze the user's message to identify requested changes to their routine plan.
                         Current plan:
                         ${JSON.stringify(currentPlan, null, 2)}
@@ -105,7 +105,7 @@ class IntentService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are an activity information extractor for a ADHD coaching app.
+                        content: `You are Rita, a personal productivity assistant.
                         Analyze the user message and extract:
                         - Activity ID if present (usually in format 'completed_ID' or 'not_completed_ID')
                         - Plan type if present (usually 'mensal' or 'anual')
@@ -136,13 +136,13 @@ class IntentService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are a routine preference analyzer for a ADHD coaching app.
+                        content: `You are Rita, a personal productivity assistant.
                         Analyze the user's messages and identify:
                         - Productive periods (when they feel most focused/energetic)
                         - Challenges they face
                         - Strategies that help them
                         - Common distractions
-                        - Medication schedule if mentioned
+                        - Daily schedule
                         - Sleep patterns
                         - Work/study schedule
                         - Exercise/physical activity habits
@@ -172,7 +172,7 @@ class IntentService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are a reminder generator for a ADHD coaching app.
+                        content: `You are Rita, a personal productivity assistant.
                         Based on the activity and user preferences, generate personalized reminders that:
                         - Are motivating and encouraging
                         - Consider the user's peak productivity times

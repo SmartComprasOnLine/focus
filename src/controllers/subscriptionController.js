@@ -10,26 +10,31 @@ class SubscriptionController {
       const trialEndDate = user.subscription?.trialEndDate;
       const isTrialActive = trialEndDate && new Date(trialEndDate) > new Date();
 
+      // Get plan prices from environment variables
+      const monthlyPrice = (parseInt(process.env.PLAN_MONTHLY_PRICE) / 100).toFixed(2);
+      const yearlyPrice = (parseInt(process.env.PLAN_YEARLY_PRICE) / 100).toFixed(2);
+      const yearlyMonthlyPrice = (yearlyPrice / 12).toFixed(2);
+
       let message;
       if (subscriptionStatus === 'ativa') {
-        message = `Você tem uma assinatura ${user.subscription.plan === 'monthly' ? 'mensal' : 'anual'} ativa até ${new Date(user.subscription.endDate).toLocaleDateString('pt-BR')}! 🎉\n\n`;
+        message = `*Você tem uma assinatura ${user.subscription.plan === 'monthly' ? 'mensal' : 'anual'} ativa até ${new Date(user.subscription.endDate).toLocaleDateString('pt-BR')}!* 🎉\n\n`;
       } else if (isTrialActive) {
         const daysLeft = Math.ceil((new Date(trialEndDate) - new Date()) / (1000 * 60 * 60 * 24));
-        message = `Você está no período de teste! Ainda tem ${daysLeft} dias para experimentar todas as funcionalidades. 🎉\n\n`;
+        message = `*Você está no período de teste!* Ainda tem ${daysLeft} dias para experimentar todas as funcionalidades. 🎉\n\n`;
       } else {
-        message = 'Você não tem uma assinatura ativa no momento.\n\n';
+        message = '*Você não tem uma assinatura ativa no momento.*\n\n';
       }
 
-      message += 'Nossos planos:\n\n' +
-        '1️⃣ Plano Mensal\n' +
-        '   • R$ 49,90/mês\n' +
-        '   • Acesso a todas as funcionalidades\n' +
-        '   • Suporte prioritário\n\n' +
-        '2️⃣ Plano Anual\n' +
-        '   • R$ 39,90/mês (R$ 478,80/ano)\n' +
-        '   • 20% de desconto\n' +
-        '   • Acesso a todas as funcionalidades\n' +
-        '   • Suporte prioritário\n\n' +
+      message += '*Nossos planos:*\n\n' +
+        '1️⃣ *Plano Mensal*\n' +
+        `   • R$ ${monthlyPrice}/mês\n` +
+        '   • _Acesso a todas as funcionalidades_\n' +
+        '   • _Suporte prioritário_\n\n' +
+        '2️⃣ *Plano Anual*\n' +
+        `   • R$ ${yearlyMonthlyPrice}/mês (R$ ${yearlyPrice}/ano)\n` +
+        '   • _20% de desconto_\n' +
+        '   • _Acesso a todas as funcionalidades_\n' +
+        '   • _Suporte prioritário_\n\n' +
         'Para assinar, responda com "plano_mensal" ou "plano_anual" 😊';
 
       await evolutionApi.sendText(user.whatsappNumber, message);
@@ -77,8 +82,8 @@ class SubscriptionController {
             price_data: {
               currency: 'brl',
               product_data: {
-                name: `Coach TDAH - Plano ${planType === 'monthly' ? 'Mensal' : 'Anual'}`,
-                description: 'Acesso ao coach pessoal para TDAH'
+                name: `Rita - Plano ${planType === 'monthly' ? 'Mensal' : 'Anual'}`,
+                description: 'Acesso à assistente pessoal Rita'
               },
               unit_amount: parseInt(priceId),
               recurring: {
@@ -158,7 +163,7 @@ class SubscriptionController {
       // Send confirmation message
       await evolutionApi.sendText(
         whatsappNumber,
-        `🎉 Parabéns! Sua assinatura do plano ${planType === 'monthly' ? 'mensal' : 'anual'} foi ativada com sucesso!\n\nContinuarei te ajudando a manter o foco e organização. Conte comigo! 💪`
+        `*🎉 Parabéns!* Sua assinatura do plano ${planType === 'monthly' ? 'mensal' : 'anual'} foi ativada com sucesso!\n\n_Continuarei te ajudando a manter o foco e organização. Conte comigo!_ 💪`
       );
     } catch (error) {
       console.error('Error handling checkout complete:', error);
@@ -189,7 +194,7 @@ class SubscriptionController {
       // Send confirmation message
       await evolutionApi.sendText(
         user.whatsappNumber,
-        '✅ Pagamento recebido com sucesso! Sua assinatura continua ativa.'
+        '*✅ Pagamento recebido com sucesso!* _Sua assinatura continua ativa._'
       );
     } catch (error) {
       console.error('Error handling invoice paid:', error);
@@ -209,7 +214,7 @@ class SubscriptionController {
       // Send payment failed message
       await evolutionApi.sendText(
         user.whatsappNumber,
-        '❌ Ops! Tivemos um problema com seu pagamento. Por favor, verifique seus dados de pagamento para continuar usando o serviço.'
+        '*❌ Ops!* _Tivemos um problema com seu pagamento. Por favor, verifique seus dados de pagamento para continuar usando o serviço._'
       );
     } catch (error) {
       console.error('Error handling payment failed:', error);
@@ -234,7 +239,7 @@ class SubscriptionController {
       // Send cancellation message
       await evolutionApi.sendText(
         user.whatsappNumber,
-        '😢 Sua assinatura foi cancelada. Esperamos que você volte em breve!\n\nCaso queira reativar, é só me avisar.'
+        '*😢 Sua assinatura foi cancelada.* _Esperamos que você volte em breve!\n\nCaso queira reativar, é só me avisar._'
       );
     } catch (error) {
       console.error('Error handling subscription canceled:', error);

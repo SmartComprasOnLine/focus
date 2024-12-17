@@ -48,7 +48,10 @@ class EvolutionApi {
                 }
             });
 
+            console.log('Response:', response.data);
+            
             if (!response.data || response.data.error) {
+                console.error('Error response:', response.data);
                 throw new Error(response.data?.error || 'Failed to send message');
             }
 

@@ -2,18 +2,8 @@ services:
   app:
     build: .
     restart: always
-    environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - MONGODB_URI=mongodb://mongodb:27017/focus_adhd
-      - EVOLUTION_API_URL=https://evo.meuchatinteligente.com.br
-      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
-      - EVOLUTION_INSTANCE=desafio
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-      - PLAN_MONTHLY_PRICE=9900
-      - PLAN_YEARLY_PRICE=99900
+    env_file:
+      - .env
     depends_on:
       - mongodb
     networks:

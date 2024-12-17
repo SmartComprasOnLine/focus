@@ -8,6 +8,67 @@ class OpenAIService {
         });
     }
 
+    async generateResponse(name, message, messageHistory = []) {
+        try {
+            console.log('Generating response for:', {
+                name,
+                message,
+                historyLength: messageHistory.length
+            });
+
+            // Check if this is the first message (no history)
+            const isFirstMessage = messageHistory.length === 1; // Only the current message
+
+            const systemPrompt = isFirstMessage ? 
+                `Você é Rita, uma assistente pessoal focada em produtividade. Esta é a primeira interação com ${name}. 
+                Dê boas-vindas calorosas e informe sobre o período de teste gratuito de 7 dias.
+                Sua resposta deve:
+                1. Ser em português
+                2. Usar formatação WhatsApp (*negrito* e _itálico_)
+                3. Mencionar o nome do usuário
+                4. Informar sobre o período de teste
+                5. Ser acolhedora e profissional
+                6. Usar no máximo 2-3 emojis
+                7. Ser concisa (máximo 3 parágrafos curtos)` :
+                `Você é Rita, uma assistente pessoal focada em produtividade. Suas respostas devem ser:
+                1. Em português
+                2. Muito concisas (máximo 3 parágrafos curtos)
+                3. Diretas e práticas
+                4. Usar emojis com moderação (máximo 2-3)
+                5. Focar em uma mensagem ou dica principal
+                6. Manter o encorajamento breve mas significativo
+                7. Usar formatação WhatsApp:
+                   - *negrito* para pontos importantes
+                   - _itálico_ para ênfase`;
+
+            const response = await this.openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL,
+                messages: [
+                    {
+                        role: "system",
+                        content: systemPrompt
+                    },
+                    ...messageHistory,
+                    {
+                        role: "user",
+                        content: message
+                    }
+                ],
+                temperature: 0.7
+            });
+
+            console.log('OpenAI response:', {
+                status: 'success',
+                content: response.choices[0].message.content
+            });
+
+            return response.choices[0].message.content;
+        } catch (error) {
+            console.error('Error generating response:', error);
+            throw error;
+        }
+    }
+
     async generateInitialPlan(name, message, messageHistory = []) {
         try {
             console.log('Generating initial plan for:', {
@@ -21,7 +82,7 @@ class OpenAIService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are Rita, a personal productivity coach. Create a personalized daily routine plan based on the user's input.
+                        content: `You are Rita, a personal productivity assistant. Create a personalized daily routine plan based on the user's input.
                         For each activity, you must specify:
                         - time: in HH:mm format
                         - task: clear description of the activity
@@ -110,50 +171,14 @@ class OpenAIService {
             // Flatten segments array
             plan.activities = plan.activities.flat();
 
+            console.log('Generated plan:', {
+                status: 'success',
+                activities: plan.activities.length
+            });
+
             return plan;
         } catch (error) {
             console.error('Error generating initial plan:', error);
-            throw error;
-        }
-    }
-
-    async generateResponse(name, message, messageHistory = []) {
-        try {
-            console.log('Generating response for:', {
-                name,
-                message,
-                historyLength: messageHistory.length
-            });
-
-            const response = await this.openai.chat.completions.create({
-                model: process.env.OPENAI_MODEL,
-                messages: [
-                    {
-                        role: "system",
-                        content: `You are Rita, a personal productivity coach. Your responses must be:
-                        1. In Portuguese
-                        2. Very concise (max 3 short paragraphs)
-                        3. Direct and practical
-                        4. Use emojis sparingly (max 2-3)
-                        5. Focus on one key message or tip
-                        6. Keep encouragement brief but meaningful
-                        7. Use WhatsApp formatting:
-                           - *bold* for important points
-                           - _italic_ for emphasis
-                           - \`\`\`monospace\`\`\` for code or structured text`
-                    },
-                    ...messageHistory,
-                    {
-                        role: "user",
-                        content: `User ${name} says: ${message}`
-                    }
-                ],
-                temperature: 0.7
-            });
-
-            return response.choices[0].message.content;
-        } catch (error) {
-            console.error('Error generating response:', error);
             throw error;
         }
     }
@@ -171,7 +196,7 @@ class OpenAIService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are Rita, a personal productivity coach. Create a minimal schedule:
+                        content: `You are Rita, a personal productivity assistant. Create a minimal schedule:
                         1. Three sections only:
                            🌅 Manhã
                            07:00 Acordar
@@ -199,6 +224,11 @@ class OpenAIService {
                 temperature: 0.7
             });
 
+            console.log('Generated summary:', {
+                status: 'success',
+                content: response.choices[0].message.content
+            });
+
             return response.choices[0].message.content;
         } catch (error) {
             console.error('Error generating plan summary:', error);
@@ -219,7 +249,7 @@ class OpenAIService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are Rita, a personal productivity coach. ${
+                        content: `You are Rita, a personal productivity assistant. ${
                             success 
                                 ? 'Generate a brief positive message in Portuguese for activity completion.' 
                                 : 'Generate a brief supportive message in Portuguese for missing an activity.'
@@ -241,6 +271,11 @@ class OpenAIService {
                     }
                 ],
                 temperature: 0.7
+            });
+
+            console.log('Generated feedback:', {
+                status: 'success',
+                content: response.choices[0].message.content
             });
 
             return response.choices[0].message.content;

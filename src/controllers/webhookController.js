@@ -106,29 +106,9 @@ class WebhookController {
 
     async processMessages(message, user) {
         try {
-            // For new users, send welcome message immediately
-            if (!user.welcomeSent) {
-                const welcomeMessage = `*Olá ${user.name}!* 👋\n\n` +
-                    '*Eu sou Rita, sua assistente pessoal!* 🌟\n\n' +
-                    '*Estou aqui para te ajudar a:*\n' +
-                    '• Criar e manter rotinas 📅\n' +
-                    '• Gerenciar tarefas e lembretes ⏰\n' +
-                    '• Melhorar seu foco e produtividade 🎯\n\n' +
-                    '_Me conte um pouco sobre sua rotina atual para começarmos!_ 💪\n\n' +
-                    '_Obs: Se precisar apagar seus dados, basta enviar "apagar meus dados"._';
-                
-                await evolutionApi.sendText(user.whatsappNumber, welcomeMessage);
-                await user.addToMessageHistory('assistant', welcomeMessage);
-                
-                // Mark welcome message as sent
-                user.welcomeSent = true;
-                user.lastActive = new Date();
-                await user.save();
-            } else {
-                // Update lastActive timestamp for returning users
-                user.lastActive = new Date();
-                await user.save();
-            }
+            // Update lastActive timestamp
+            user.lastActive = new Date();
+            await user.save();
 
             // Get message history for context
             const messageHistory = user.getMessageHistory();
@@ -138,7 +118,8 @@ class WebhookController {
                 hasActivePlan: !!user.activeRoutineId,
                 subscriptionStatus: user.subscription.status,
                 preferences: user.preferences || {},
-                messageHistory: messageHistory
+                messageHistory: messageHistory,
+                isNewUser: !user.welcomeSent
             };
 
             try {
@@ -147,24 +128,6 @@ class WebhookController {
 
                 let response;
                 switch (intent) {
-                    case 'delete_data': {
-                        // Delete user's routines
-                        if (user.activeRoutineId) {
-                            await Routine.deleteMany({ userId: user._id });
-                        }
-                        
-                        // Delete user
-                        await User.deleteOne({ _id: user._id });
-
-                        // Send confirmation message
-                        const deleteMessage = '*Seus dados foram apagados com sucesso.* 🗑️\n\n' +
-                            '_Todas as suas informações foram removidas do nosso banco de dados._\n\n' +
-                            'Se quiser voltar a usar o serviço, é só me mandar uma mensagem! 👋';
-                        
-                        await evolutionApi.sendText(user.whatsappNumber, deleteMessage);
-                        break;
-                    }
-
                     case 'create_plan':
                         await routineController.createInitialPlan(user, { initialMessage: message });
                         break;
@@ -223,6 +186,12 @@ class WebhookController {
                         response = await openaiService.generateResponse(user.name, message, messageHistory);
                         await evolutionApi.sendText(user.whatsappNumber, response);
                         await user.addToMessageHistory('assistant', response);
+
+                        // Mark welcome message as sent if this is the first interaction
+                        if (!user.welcomeSent) {
+                            user.welcomeSent = true;
+                            await user.save();
+                        }
                         break;
                     }
                 }

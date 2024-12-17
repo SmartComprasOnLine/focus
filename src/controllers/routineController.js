@@ -48,15 +48,18 @@ class RoutineController {
       // Setup reminders
       await reminderService.setupReminders(user, routine);
 
-      // Send plan to user
+      // Format activities for WhatsApp
+      const formattedActivities = plan.activities.map(a => 
+        `⏰ *${a.time}* - _${a.task}_ (${a.duration}min)`
+      ).join('\n');
+
+      // Send plan to user with WhatsApp formatting
       await evolutionApi.sendText(
         user.whatsappNumber,
-        `Ótimo! Criei um plano personalizado para você:\n\n` +
-        plan.activities.map(a => 
-          `${a.time} - ${a.task} (${a.duration} minutos)`
-        ).join('\n') +
-        '\n\nConfigurei lembretes para ajudar você a seguir o plano. Você receberá notificações nos horários programados.\n\n' +
-        'Vamos começar? Responda "sim" para confirmar ou me diga se precisar de ajustes. 😊'
+        `*Ótimo! Criei um plano personalizado para você:* 🎯\n\n` +
+        formattedActivities +
+        '\n\n_Configurei lembretes para ajudar você a seguir o plano. Você receberá notificações nos horários programados._ ⏰\n\n' +
+        '*Vamos começar?* Responda "sim" para confirmar ou me diga se precisar de ajustes. 😊'
       );
 
       return routine;
@@ -89,10 +92,10 @@ class RoutineController {
         await routine.save();
       }
 
-      // Send analysis to user
+      // Send analysis to user with WhatsApp formatting
       await evolutionApi.sendText(
         user.whatsappNumber,
-        `Análise do seu progresso:\n\n${analysis}`
+        `*Análise do seu progresso:* 📊\n\n_${analysis}_`
       );
 
       return routine;
@@ -121,7 +124,11 @@ class RoutineController {
         progress
       );
 
-      await evolutionApi.sendText(user.whatsappNumber, motivation);
+      // Send motivation with WhatsApp formatting
+      await evolutionApi.sendText(
+        user.whatsappNumber,
+        `*Mensagem do dia:* 🌟\n\n_${motivation}_`
+      );
     } catch (error) {
       console.error('Error generating daily motivation:', error);
       throw error;
@@ -136,7 +143,7 @@ class RoutineController {
       if (!routine) {
         await evolutionApi.sendText(
           user.whatsappNumber,
-          'Você ainda não tem um plano criado. Que tal me contar um pouco sobre sua rotina para eu criar um plano personalizado? 😊'
+          '*Você ainda não tem um plano criado.* 📝\n\n_Que tal me contar um pouco sobre sua rotina para eu criar um plano personalizado?_ 😊'
         );
         return;
       }
@@ -147,10 +154,21 @@ class RoutineController {
         routine
       );
 
-      // Send summary to user
+      // Format sections for WhatsApp
+      const formattedSummary = summary
+        .replace(/🌅 Manhã/g, '*🌅 Manhã*')
+        .replace(/🌞 Tarde/g, '*🌞 Tarde*')
+        .replace(/🌙 Noite/g, '*🌙 Noite*')
+        .replace(/(\d{2}:\d{2})/g, '*$1*')
+        .split('\n')
+        .map(line => line.includes(':') && !line.includes('Manhã') && !line.includes('Tarde') && !line.includes('Noite') ? 
+          `_${line}_` : line)
+        .join('\n');
+
+      // Send summary to user with WhatsApp formatting
       await evolutionApi.sendText(
         user.whatsappNumber,
-        `Aqui está o resumo do seu plano:\n\n${summary}\n\nPrecisa de algum ajuste? Me avise! 😊`
+        `*Aqui está o resumo do seu plano:* 📋\n\n${formattedSummary}\n\n_Precisa de algum ajuste? Me avise!_ 😊`
       );
 
       return routine;

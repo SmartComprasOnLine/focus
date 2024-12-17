@@ -10,68 +10,51 @@ class OpenAIService {
 
     async generateResponse(name, message, messageHistory = []) {
         try {
-            console.log('Generating response for:', {
+            console.log('Gerando resposta para:', {
                 name,
                 message,
                 historyLength: messageHistory.length
             });
 
-            // Check if this is the first message (no history)
-            const isFirstMessage = messageHistory.length === 1; // Only the current message
+            // Verifica se é a primeira mensagem (sem histórico)
+            const isFirstMessage = messageHistory.length === 1;
 
-            const systemPrompt = isFirstMessage ? 
-                `Você é Rita, uma assistente pessoal focada em produtividade. Esta é a primeira interação com ${name}. 
-                Dê boas-vindas calorosas e informe sobre o período de teste gratuito de 7 dias.
+            const systemPrompt = isFirstMessage
+                ? `Você é Rita, uma assistente pessoal especializada em produtividade. Esta é a primeira interação com ${name}.
                 Sua resposta deve:
-                1. Ser em português
-                2. Usar formatação WhatsApp (*negrito* e _itálico_)
-                3. Mencionar o nome do usuário
-                4. Informar sobre o período de teste
-                5. Ser acolhedora e profissional
-                6. Usar no máximo 2-3 emojis
-                7. Ser concisa (máximo 3 parágrafos curtos)` :
-                `Você é Rita, uma assistente pessoal focada em produtividade. Suas respostas devem ser:
-                1. Em português
-                2. Muito concisas (máximo 3 parágrafos curtos)
-                3. Diretas e práticas
-                4. Usar emojis com moderação (máximo 2-3)
-                5. Focar em uma mensagem ou dica principal
-                6. Manter o encorajamento breve mas significativo
-                7. Usar formatação WhatsApp:
-                   - *negrito* para pontos importantes
-                   - _itálico_ para ênfase`;
+                - Ser calorosa e profissional, com boas-vindas iniciais.
+                - Informar sobre o período de teste gratuito de *7 dias*.
+                - Utilizar formatação do WhatsApp com *negrito* e _itálico_.
+                - Ter no máximo *3 parágrafos curtos* e incluir o nome do usuário.
+                - Ser acolhedora e motivadora, mantendo um tom amigável.
+                - Adicionar até 2 emojis relevantes.`
+                : "Você é Rita, uma assistente pessoal focada em produtividade, fornecendo apoio e respostas personalizadas ao usuário.";
 
             const response = await this.openai.chat.completions.create({
                 model: process.env.OPENAI_MODEL,
                 messages: [
-                    {
-                        role: "system",
-                        content: systemPrompt
-                    },
+                    { role: "system", content: systemPrompt },
                     ...messageHistory,
-                    {
-                        role: "user",
-                        content: message
-                    }
+                    { role: "user", content: message }
                 ],
                 temperature: 0.7
             });
 
-            console.log('OpenAI response:', {
-                status: 'success',
+            console.log('Resposta da OpenAI:', {
+                status: 'sucesso',
                 content: response.choices[0].message.content
             });
 
             return response.choices[0].message.content;
         } catch (error) {
-            console.error('Error generating response:', error);
+            console.error('Erro ao gerar resposta:', error);
             throw error;
         }
     }
 
     async generateInitialPlan(name, message, messageHistory = []) {
         try {
-            console.log('Generating initial plan for:', {
+            console.log('Gerando plano inicial para:', {
                 name,
                 message,
                 historyLength: messageHistory.length
@@ -82,42 +65,42 @@ class OpenAIService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are Rita, a personal productivity assistant. Create a personalized daily routine plan based on the user's input.
-                        For each activity, you must specify:
-                        - time: in HH:mm format
-                        - task: clear description of the activity
-                        - duration: in minutes (minimum 5 minutes, maximum 240 minutes per segment)
-                        - reminders: motivational messages for before, start, during, end, and follow-up
+                        content: `Você é Rita, uma assistente pessoal focada em produtividade. Crie um plano diário personalizado com base na entrada do usuário.
+                        Para cada atividade, forneça:
+                        - *horário*: formato HH:mm
+                        - *tarefa*: descrição clara da atividade
+                        - *duração*: entre 5 e 240 minutos
+                        - *lembretes*: mensagens motivacionais para antes, início, durante, final e acompanhamento
 
-                        Return the plan in this exact JSON format:
+                        Retorne o plano neste formato JSON:
                         {
-                            "activities": [
+                            "atividades": [
                                 {
-                                    "time": "HH:mm",
-                                    "task": "Task description",
-                                    "duration": number_between_5_and_240,
-                                    "reminders": {
-                                        "before": "Reminder message",
-                                        "start": "Start message",
-                                        "during": ["During message"],
-                                        "end": "End message",
-                                        "followUp": "Follow-up message"
+                                    "horário": "HH:mm",
+                                    "tarefa": "Descrição da tarefa",
+                                    "duração": número_entre_5_e_240,
+                                    "lembretes": {
+                                        "antes": "Mensagem de lembrete",
+                                        "início": "Mensagem de início",
+                                        "durante": ["Mensagem durante"],
+                                        "final": "Mensagem final",
+                                        "acompanhamento": "Mensagem de acompanhamento"
                                     }
                                 }
                             ]
                         }
 
-                        Important rules:
-                        1. Every activity must have a duration between 5 and 240 minutes
-                        2. Long activities (>4 hours) should be split into multiple segments
-                        3. Include breaks and transitions between activities
-                        4. Reminders should be motivational and include emojis
-                        5. Consider productivity and focus when scheduling activities`
+                        Regras importantes:
+                        1. A duração de cada atividade deve estar entre *5 e 240 minutos*.
+                        2. Divida atividades longas (>4 horas) em partes menores.
+                        3. Inclua pausas estratégicas entre atividades.
+                        4. Use lembretes motivacionais com emojis ✨.
+                        5. Foque na produtividade, com um ritmo equilibrado e otimizado.`
                     },
                     ...messageHistory,
                     {
                         role: "user",
-                        content: `Create a plan for ${name} based on: ${message}`
+                        content: `Crie um plano para ${name} com base em: ${message}`
                     }
                 ],
                 temperature: 0.7,
@@ -126,38 +109,34 @@ class OpenAIService {
 
             const plan = JSON.parse(response.choices[0].message.content);
 
-            // Validate and adjust durations
-            plan.activities = plan.activities.map(activity => {
-                // Ensure minimum duration
-                activity.duration = Math.max(5, activity.duration || 30);
-                
-                // Split long activities into segments
-                if (activity.duration > 240) {
+            plan.atividades = plan.atividades.map(activity => {
+                activity.duração = Math.max(5, activity.duração || 30);
+
+                if (activity.duração > 240) {
                     const segments = [];
-                    let remainingDuration = activity.duration;
-                    let currentTime = activity.time;
+                    let remainingDuration = activity.duração;
+                    let currentTime = activity.horário;
 
                     while (remainingDuration > 0) {
                         const segmentDuration = Math.min(remainingDuration, 240);
                         segments.push({
-                            time: currentTime,
-                            task: `${activity.task} (Part ${segments.length + 1})`,
-                            duration: segmentDuration,
-                            reminders: {
-                                before: `⏰ Prepare-se para continuar ${activity.task}!`,
-                                start: `🎯 Hora de continuar ${activity.task}!`,
-                                during: [`💪 Continue focado em ${activity.task}!`],
-                                end: segments.length === Math.ceil(activity.duration / 240) - 1 
-                                    ? `✅ Hora de finalizar ${activity.task}!`
-                                    : `⏸️ Hora de fazer uma pausa de ${activity.task}!`,
-                                followUp: segments.length === Math.ceil(activity.duration / 240) - 1
-                                    ? `🌟 Parabéns por completar ${activity.task}!`
-                                    : `🔋 Aproveite sua pausa!`
+                            horário: currentTime,
+                            tarefa: `${activity.tarefa} (Parte ${segments.length + 1})`,
+                            duração: segmentDuration,
+                            lembretes: {
+                                antes: `⏰ Prepare-se para continuar _${activity.tarefa}_!`,
+                                início: `🚀 Vamos focar em _${activity.tarefa}_!`,
+                                durante: [`💡 Mantenha o foco em _${activity.tarefa}_.`],
+                                final: remainingDuration <= 240
+                                    ? `✅ Você concluiu _${activity.tarefa}_!`
+                                    : `⏸️ Hora de uma pausa de _${activity.tarefa}_!`,
+                                acompanhamento: remainingDuration <= 240
+                                    ? `🎉 Excelente trabalho em _${activity.tarefa}_!`
+                                    : `🔋 Recarregue as energias para continuar!`
                             }
                         });
 
                         remainingDuration -= segmentDuration;
-                        // Calculate next segment start time
                         const [hours, minutes] = currentTime.split(':').map(Number);
                         const nextTime = new Date(2024, 0, 1, hours, minutes + segmentDuration + 15);
                         currentTime = nextTime.toTimeString().slice(0, 5);
@@ -168,24 +147,23 @@ class OpenAIService {
                 return activity;
             });
 
-            // Flatten segments array
-            plan.activities = plan.activities.flat();
+            plan.atividades = plan.atividades.flat();
 
-            console.log('Generated plan:', {
-                status: 'success',
-                activities: plan.activities.length
+            console.log('Plano gerado:', {
+                status: 'sucesso',
+                atividades: plan.atividades.length
             });
 
             return plan;
         } catch (error) {
-            console.error('Error generating initial plan:', error);
+            console.error('Erro ao gerar plano inicial:', error);
             throw error;
         }
     }
 
     async generatePlanSummary(name, routine, messageHistory = []) {
         try {
-            console.log('Generating plan summary for:', {
+            console.log('Gerando resumo do plano para:', {
                 name,
                 routine,
                 historyLength: messageHistory.length
@@ -196,91 +174,34 @@ class OpenAIService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are Rita, a personal productivity assistant. Create a minimal schedule:
-                        1. Three sections only:
-                           🌅 Manhã
-                           07:00 Acordar
-                           
-                           🌞 Tarde
-                           12:00 Almoço
-                           
-                           🌙 Noite
-                           22:00 Dormir
-                        2. Max 3 activities per section
-                        3. Use format "HH:MM Atividade"
-                        4. Single word activities in Portuguese
-                        5. One line motivation in Portuguese
-                        6. Use WhatsApp formatting:
-                           - *bold* for times and section headers
-                           - _italic_ for activities
-                           - Add emojis for context`
+                        content: `Você é Rita, uma assistente de produtividade. Resuma o plano diário em três seções:
+                        *🌅 Manhã*
+                        *🌞 Tarde*
+                        *🌙 Noite*
+
+                        Cada seção deve ter:
+                        - Máximo de 3 atividades
+                        - Formato "HH:MM _Atividade_"
+                        - Uma linha motivacional no final
+                        - Emojis contextuais e *negrito* no horário/seção`
                     },
                     ...messageHistory,
                     {
                         role: "user",
-                        content: `Create a summary for ${name}'s plan: ${JSON.stringify(routine)}`
+                        content: `Resuma o plano de ${name}: ${JSON.stringify(routine)}`
                     }
                 ],
                 temperature: 0.7
             });
 
-            console.log('Generated summary:', {
-                status: 'success',
+            console.log('Resumo gerado:', {
+                status: 'sucesso',
                 content: response.choices[0].message.content
             });
 
             return response.choices[0].message.content;
         } catch (error) {
-            console.error('Error generating plan summary:', error);
-            throw error;
-        }
-    }
-
-    async generateActivityFeedback(name, success = true, messageHistory = []) {
-        try {
-            console.log('Generating activity feedback for:', {
-                name,
-                success,
-                historyLength: messageHistory.length
-            });
-
-            const response = await this.openai.chat.completions.create({
-                model: process.env.OPENAI_MODEL,
-                messages: [
-                    {
-                        role: "system",
-                        content: `You are Rita, a personal productivity assistant. ${
-                            success 
-                                ? 'Generate a brief positive message in Portuguese for activity completion.' 
-                                : 'Generate a brief supportive message in Portuguese for missing an activity.'
-                        }
-                        Your response must:
-                        1. Be just 1-2 short sentences in Portuguese
-                        2. Use maximum 1 emoji
-                        3. Focus on moving forward
-                        4. Avoid lengthy explanations
-                        5. Keep encouragement simple and direct
-                        6. Use WhatsApp formatting:
-                           - *bold* for emphasis
-                           - _italic_ for gentle encouragement`
-                    },
-                    ...messageHistory,
-                    {
-                        role: "user",
-                        content: `Generate ${success ? 'positive' : 'supportive'} feedback for ${name}`
-                    }
-                ],
-                temperature: 0.7
-            });
-
-            console.log('Generated feedback:', {
-                status: 'success',
-                content: response.choices[0].message.content
-            });
-
-            return response.choices[0].message.content;
-        } catch (error) {
-            console.error('Error generating activity feedback:', error);
+            console.error('Erro ao gerar resumo do plano:', error);
             throw error;
         }
     }

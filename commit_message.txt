@@ -1,20 +1,21 @@
-fix: Resolve webhook and server configuration issues
+feat: Move welcome message to OpenAI
 
-- Fix API key validation in webhook controller
-- Fix MongoDB connection in Docker environment
-- Fix webhook request handling and logging
-- Fix raw body parsing for webhooks
-- Fix JSON parsing for webhook requests
-- Fix database connection error handling
-- Fix webhook response handling
-- Fix environment variable configuration
-- Fix Docker networking configuration
-- Fix port mappings and service dependencies
+- Remove hardcoded welcome message
+- Add first message detection
+- Add trial period information
+- Add dynamic welcome system prompt
+- Add WhatsApp formatting
+- Add better personalization
+- Add message history check
+- Add user context handling
+- Add trial status info
+- Add better error handling
+- Add detailed logging
+- Add proper message flow
 
-This change resolves several issues with webhook handling, database connections, and Docker configuration, ensuring proper functionality in production. The system now correctly:
-1. Validates API keys from headers
-2. Connects to MongoDB in Docker network
-3. Handles webhook requests properly
-4. Processes messages correctly
-5. Stores data in MongoDB
-6. Responds to Evolution API
+This change improves the welcome experience by:
+1. Using OpenAI for dynamic welcome messages
+2. Including trial period information
+3. Using proper WhatsApp formatting
+4. Adding better personalization
+5. Maintaining conversation context

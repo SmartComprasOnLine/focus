@@ -3,6 +3,42 @@ const User = require('../models/User');
 const evolutionApi = require('../services/evolutionApi');
 
 class SubscriptionController {
+  async showPlans(user) {
+    try {
+      // Check current subscription status
+      const subscriptionStatus = user.subscription?.status || 'em_teste';
+      const trialEndDate = user.subscription?.trialEndDate;
+      const isTrialActive = trialEndDate && new Date(trialEndDate) > new Date();
+
+      let message;
+      if (subscriptionStatus === 'ativa') {
+        message = `Você tem uma assinatura ${user.subscription.plan === 'monthly' ? 'mensal' : 'anual'} ativa até ${new Date(user.subscription.endDate).toLocaleDateString('pt-BR')}! 🎉\n\n`;
+      } else if (isTrialActive) {
+        const daysLeft = Math.ceil((new Date(trialEndDate) - new Date()) / (1000 * 60 * 60 * 24));
+        message = `Você está no período de teste! Ainda tem ${daysLeft} dias para experimentar todas as funcionalidades. 🎉\n\n`;
+      } else {
+        message = 'Você não tem uma assinatura ativa no momento.\n\n';
+      }
+
+      message += 'Nossos planos:\n\n' +
+        '1️⃣ Plano Mensal\n' +
+        '   • R$ 49,90/mês\n' +
+        '   • Acesso a todas as funcionalidades\n' +
+        '   • Suporte prioritário\n\n' +
+        '2️⃣ Plano Anual\n' +
+        '   • R$ 39,90/mês (R$ 478,80/ano)\n' +
+        '   • 20% de desconto\n' +
+        '   • Acesso a todas as funcionalidades\n' +
+        '   • Suporte prioritário\n\n' +
+        'Para assinar, responda com "plano_mensal" ou "plano_anual" 😊';
+
+      await evolutionApi.sendText(user.whatsappNumber, message);
+    } catch (error) {
+      console.error('Error showing plans:', error);
+      throw error;
+    }
+  }
+
   async createCheckoutSession(req, res) {
     try {
       const { whatsappNumber, planType } = req.body;

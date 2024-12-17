@@ -14,6 +14,13 @@ class WebhookController {
 
     async handleWebhook(req, res) {
         try {
+            // Validate API key
+            const apiKey = req.body.apikey;
+            if (!apiKey || apiKey !== process.env.EVOLUTION_API_KEY) {
+                console.error('Invalid API key');
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+
             // Validate webhook data
             if (!req.body.data || !req.body.data.message || !req.body.data.key) {
                 console.error('Invalid webhook data:', req.body);
@@ -112,69 +119,77 @@ class WebhookController {
                 subscriptionStatus: user.subscription.status,
                 preferences: user.preferences || {}
             };
-            const intent = await intentService.detectIntent(message, userContext);
-            console.log('Detected intent:', intent);
 
-            switch (intent) {
-                case 'create_plan':
-                    await routineController.createInitialPlan(user, { initialMessage: message });
-                    break;
+            try {
+                const intent = await intentService.detectIntent(message, userContext);
+                console.log('Detected intent:', intent);
 
-                case 'update_plan':
-                    if (!user.activeRoutineId) {
-                        // If user doesn't have a plan yet, create one
+                switch (intent) {
+                    case 'create_plan':
                         await routineController.createInitialPlan(user, { initialMessage: message });
-                    } else {
-                        // Update existing plan
-                        await routineController.updatePlan(user, message);
+                        break;
+
+                    case 'update_plan':
+                        if (!user.activeRoutineId) {
+                            // If user doesn't have a plan yet, create one
+                            await routineController.createInitialPlan(user, { initialMessage: message });
+                        } else {
+                            // Update existing plan
+                            await routineController.updatePlan(user, message);
+                        }
+                        break;
+
+                    case 'show_plan':
+                        await routineController.getPlanSummary(user);
+                        break;
+
+                    case 'activity_completed': {
+                        const activityInfo = await intentService.extractActivityInfo(message);
+                        if (activityInfo && activityInfo.activityId) {
+                            await routineController.completeActivity(user, activityInfo.activityId);
+                        }
+                        break;
                     }
-                    break;
 
-                case 'show_plan':
-                    await routineController.getPlanSummary(user);
-                    break;
-
-                case 'activity_completed': {
-                    const activityInfo = await intentService.extractActivityInfo(message);
-                    if (activityInfo && activityInfo.activityId) {
-                        await routineController.completeActivity(user, activityInfo.activityId);
+                    case 'activity_not_completed': {
+                        const activityInfo = await intentService.extractActivityInfo(message);
+                        if (activityInfo && activityInfo.activityId) {
+                            await routineController.skipActivity(user, activityInfo.activityId);
+                        }
+                        break;
                     }
-                    break;
-                }
 
-                case 'activity_not_completed': {
-                    const activityInfo = await intentService.extractActivityInfo(message);
-                    if (activityInfo && activityInfo.activityId) {
-                        await routineController.skipActivity(user, activityInfo.activityId);
+                    case 'subscription_inquiry':
+                        await subscriptionController.showPlans(user);
+                        break;
+
+                    case 'select_plan': {
+                        const planInfo = await intentService.extractActivityInfo(message);
+                        if (planInfo && planInfo.planType) {
+                            await subscriptionController.createPaymentLink(user, planInfo.planType);
+                        }
+                        break;
                     }
-                    break;
-                }
 
-                case 'subscription_inquiry':
-                    await subscriptionController.showPlans(user);
-                    break;
-
-                case 'select_plan': {
-                    const planInfo = await intentService.extractActivityInfo(message);
-                    if (planInfo && planInfo.planType) {
-                        await subscriptionController.createPaymentLink(user, planInfo.planType);
+                    case 'goodbye': {
+                        await evolutionApi.sendText(user.whatsappNumber,
+                            `Sempre à disposição ${user.name}! 😊 Continue focado nos seus objetivos! 💪`
+                        );
+                        break;
                     }
-                    break;
-                }
 
-                case 'goodbye': {
-                    await evolutionApi.sendText(user.whatsappNumber,
-                        `Sempre à disposição ${user.name}! 😊 Continue focado nos seus objetivos! 💪`
-                    );
-                    break;
+                    default: {
+                        // Generate contextual response
+                        const response = await openaiService.generateResponse(user.name, message);
+                        await evolutionApi.sendText(user.whatsappNumber, response);
+                        break;
+                    }
                 }
-
-                default: {
-                    // Generate contextual response
-                    const response = await openaiService.generateResponse(user.name, message);
-                    await evolutionApi.sendText(user.whatsappNumber, response);
-                    break;
-                }
+            } catch (error) {
+                console.error('Error processing intent:', error);
+                await evolutionApi.sendText(user.whatsappNumber,
+                    'Desculpe, tive um problema ao processar sua mensagem. Por favor, tente novamente.'
+                );
             }
         } catch (error) {
             console.error('Error processing messages:', error);

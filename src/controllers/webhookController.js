@@ -128,6 +128,21 @@ class WebhookController {
 
                 let response;
                 switch (intent) {
+                    case 'confirm_plan': {
+                        const confirmMessage = `Perfeito! 🎯 Seu plano está confirmado e ativo. 
+
+Dicas para aproveitar melhor os lembretes:
+• Quando completar uma atividade, me avise dizendo "completei"
+• Se precisar pular uma atividade, diga "não completei"
+• Para ver seu plano atual, peça "mostrar plano"
+• Para fazer ajustes, é só me dizer o que quer mudar
+
+Estou aqui para ajudar você a manter o foco! 💪`;
+                        
+                        await evolutionApi.sendText(user.whatsappNumber, confirmMessage);
+                        await user.addToMessageHistory('assistant', confirmMessage);
+                        break;
+                    }
                     case 'initial_message': {
                         if (!user.welcomeSent) {
                             response = await openaiService.generateResponse(user.name, message, messageHistory);

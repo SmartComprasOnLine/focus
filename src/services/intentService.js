@@ -19,6 +19,13 @@ class IntentService {
                 return 'delete_data';
             }
 
+            if (lowerMessage === 'sim' || 
+                lowerMessage === 'ótimo' || 
+                lowerMessage === 'ok' ||
+                lowerMessage === 'beleza') {
+                return 'confirm_plan';
+            }
+
             const response = await this.openai.chat.completions.create({
                 model: process.env.OPENAI_MODEL,
                 messages: [

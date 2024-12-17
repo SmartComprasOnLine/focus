@@ -9,9 +9,6 @@ const routes = require('./routes');
 // Initialize express app
 const app = express();
 
-// Connect to MongoDB
-connectDB();
-
 // CORS configuration
 const corsOptions = {
     origin: '*',
@@ -70,12 +67,23 @@ app.use((req, res) => {
     res.status(404).json({ error: 'Route not found' });
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV}`);
-});
+// Start server function
+const startServer = async () => {
+    try {
+        // Connect to MongoDB first
+        await connectDB();
+
+        // Then start the server
+        const PORT = process.env.PORT || 3001;
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV}`);
+        });
+    } catch (error) {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+    }
+};
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
@@ -85,5 +93,8 @@ process.on('unhandledRejection', (err) => {
         process.exit(1);
     }
 });
+
+// Start the server
+startServer();
 
 module.exports = app;

@@ -14,25 +14,45 @@ class WebhookController {
 
     async handleWebhook(req, res) {
         try {
-            // Validate API key from headers or query params
-            const apiKey = req.headers['x-api-key'] || req.query.apikey || req.body.apikey;
+            // Extract API key from various possible locations
+            const apiKey = req.headers['x-api-key'] || 
+                          req.headers['apikey'] || 
+                          req.query.apikey || 
+                          req.body.apikey || 
+                          (typeof req.body === 'string' ? req.body : null);
+
+            console.log('Received API key:', {
+                headers: {
+                    'x-api-key': req.headers['x-api-key'],
+                    'apikey': req.headers['apikey']
+                },
+                query: req.query.apikey,
+                body: req.body.apikey || (typeof req.body === 'string' ? req.body : undefined)
+            });
+
             if (!apiKey || apiKey !== process.env.EVOLUTION_API_KEY) {
-                console.error('Invalid API key:', { 
-                    headers: req.headers['x-api-key'],
+                console.error('Invalid API key:', {
+                    headers: {
+                        'x-api-key': req.headers['x-api-key'],
+                        'apikey': req.headers['apikey']
+                    },
                     query: req.query.apikey,
-                    body: req.body.apikey 
+                    body: req.body.apikey || (typeof req.body === 'string' ? req.body : undefined)
                 });
                 return res.status(401).json({ error: 'Unauthorized' });
             }
 
+            // Parse body if it's a string
+            const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+
             // Validate webhook data
-            if (!req.body.data || !req.body.data.message || !req.body.data.key) {
-                console.error('Invalid webhook data:', req.body);
+            if (!body.data || !body.data.message || !body.data.key) {
+                console.error('Invalid webhook data:', body);
                 return res.status(400).json({ error: 'Missing required fields' });
             }
 
             // Extract message and number
-            const messageData = req.body.data;
+            const messageData = body.data;
             const number = messageData.key.remoteJid.replace('@s.whatsapp.net', '');
             const message = messageData.message.conversation;
             const name = messageData.pushName || `User ${number.slice(-4)}`;

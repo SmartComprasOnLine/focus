@@ -8,8 +8,14 @@ class OpenAIService {
         });
     }
 
-    async generateInitialPlan(name, message) {
+    async generateInitialPlan(name, message, messageHistory = []) {
         try {
+            console.log('Generating initial plan for:', {
+                name,
+                message,
+                historyLength: messageHistory.length
+            });
+
             const response = await this.openai.chat.completions.create({
                 model: process.env.OPENAI_MODEL,
                 messages: [
@@ -47,6 +53,7 @@ class OpenAIService {
                         4. Reminders should be motivational and include emojis
                         5. Consider ADHD challenges when scheduling activities`
                     },
+                    ...messageHistory,
                     {
                         role: "user",
                         content: `Create a plan for ${name} based on: ${message}`
@@ -76,15 +83,15 @@ class OpenAIService {
                             task: `${activity.task} (Part ${segments.length + 1})`,
                             duration: segmentDuration,
                             reminders: {
-                                before: `Prepare-se para continuar ${activity.task}!`,
-                                start: `Hora de continuar ${activity.task}!`,
-                                during: [`Continue focado em ${activity.task}!`],
+                                before: `⏰ Prepare-se para continuar ${activity.task}!`,
+                                start: `🎯 Hora de continuar ${activity.task}!`,
+                                during: [`💪 Continue focado em ${activity.task}!`],
                                 end: segments.length === Math.ceil(activity.duration / 240) - 1 
-                                    ? `Hora de finalizar ${activity.task}!`
-                                    : `Hora de fazer uma pausa de ${activity.task}!`,
+                                    ? `✅ Hora de finalizar ${activity.task}!`
+                                    : `⏸️ Hora de fazer uma pausa de ${activity.task}!`,
                                 followUp: segments.length === Math.ceil(activity.duration / 240) - 1
-                                    ? `Parabéns por completar ${activity.task}!`
-                                    : `Aproveite sua pausa!`
+                                    ? `🌟 Parabéns por completar ${activity.task}!`
+                                    : `🔋 Aproveite sua pausa!`
                             }
                         });
 
@@ -110,8 +117,14 @@ class OpenAIService {
         }
     }
 
-    async generateResponse(name, message) {
+    async generateResponse(name, message, messageHistory = []) {
         try {
+            console.log('Generating response for:', {
+                name,
+                message,
+                historyLength: messageHistory.length
+            });
+
             const response = await this.openai.chat.completions.create({
                 model: process.env.OPENAI_MODEL,
                 messages: [
@@ -123,8 +136,13 @@ class OpenAIService {
                         3. Direct and practical
                         4. Use emojis sparingly (max 2-3)
                         5. Focus on one key message or tip
-                        6. Keep encouragement brief but meaningful`
+                        6. Keep encouragement brief but meaningful
+                        7. Use WhatsApp formatting:
+                           - *bold* for important points
+                           - _italic_ for emphasis
+                           - \`\`\`monospace\`\`\` for code or structured text`
                     },
+                    ...messageHistory,
                     {
                         role: "user",
                         content: `User ${name} says: ${message}`
@@ -140,8 +158,14 @@ class OpenAIService {
         }
     }
 
-    async generatePlanSummary(name, routine) {
+    async generatePlanSummary(name, routine, messageHistory = []) {
         try {
+            console.log('Generating plan summary for:', {
+                name,
+                routine,
+                historyLength: messageHistory.length
+            });
+
             const response = await this.openai.chat.completions.create({
                 model: process.env.OPENAI_MODEL,
                 messages: [
@@ -160,8 +184,13 @@ class OpenAIService {
                         2. Max 3 activities per section
                         3. Use format "HH:MM Atividade"
                         4. Single word activities in Portuguese
-                        5. One line motivation in Portuguese`
+                        5. One line motivation in Portuguese
+                        6. Use WhatsApp formatting:
+                           - *bold* for times and section headers
+                           - _italic_ for activities
+                           - Add emojis for context`
                     },
+                    ...messageHistory,
                     {
                         role: "user",
                         content: `Create a summary for ${name}'s plan: ${JSON.stringify(routine)}`
@@ -177,8 +206,14 @@ class OpenAIService {
         }
     }
 
-    async generateActivityFeedback(name, success = true) {
+    async generateActivityFeedback(name, success = true, messageHistory = []) {
         try {
+            console.log('Generating activity feedback for:', {
+                name,
+                success,
+                historyLength: messageHistory.length
+            });
+
             const response = await this.openai.chat.completions.create({
                 model: process.env.OPENAI_MODEL,
                 messages: [
@@ -194,8 +229,12 @@ class OpenAIService {
                         2. Use maximum 1 emoji
                         3. Focus on moving forward
                         4. Avoid lengthy explanations
-                        5. Keep encouragement simple and direct`
+                        5. Keep encouragement simple and direct
+                        6. Use WhatsApp formatting:
+                           - *bold* for emphasis
+                           - _italic_ for gentle encouragement`
                     },
+                    ...messageHistory,
                     {
                         role: "user",
                         content: `Generate ${success ? 'positive' : 'supportive'} feedback for ${name}`

@@ -13,17 +13,17 @@ class RoutineController {
       console.log('Generated plan:', JSON.stringify(plan, null, 2));
 
       // Convert activities to reminders
-      const activities = plan.activities.map(activity => {
-        const scheduledTime = activity.time;
-        console.log(`Processing activity at ${scheduledTime}: ${activity.task}`);
+      const activities = plan.atividades.map(activity => {
+        const scheduledTime = activity.horário;
+        console.log(`Processing activity at ${scheduledTime}: ${activity.tarefa}`);
         
         return {
-          activity: activity.task,
+          activity: activity.tarefa,
           scheduledTime: scheduledTime,
           type: 'routine',
           status: 'active',
-          duration: activity.duration,
-          messages: activity.reminders
+          duration: activity.duração,
+          messages: activity.lembretes
         };
       });
 
@@ -49,8 +49,8 @@ class RoutineController {
       await reminderService.setupReminders(user, routine);
 
       // Format activities for WhatsApp
-      const formattedActivities = plan.activities.map(a => 
-        `⏰ *${a.time}* - _${a.task}_ (${a.duration}min)`
+      const formattedActivities = plan.atividades.map(a => 
+        `⏰ *${a.horário}* - _${a.tarefa}_ (${a.duração}min)`
       ).join('\n');
 
       // Send plan to user with WhatsApp formatting

@@ -21,29 +21,36 @@ class WebhookController {
                           req.body.apikey || 
                           (typeof req.body === 'string' ? req.body : null);
 
-            console.log('Received API key:', {
-                headers: {
-                    'x-api-key': req.headers['x-api-key'],
-                    'apikey': req.headers['apikey']
-                },
-                query: req.query.apikey,
-                body: req.body.apikey || (typeof req.body === 'string' ? req.body : undefined)
+            console.log('API Key Comparison:', {
+                received: apiKey,
+                expected: process.env.EVOLUTION_API_KEY,
+                matches: apiKey === process.env.EVOLUTION_API_KEY
             });
 
             if (!apiKey || apiKey !== process.env.EVOLUTION_API_KEY) {
                 console.error('Invalid API key:', {
+                    received: apiKey,
+                    expected: process.env.EVOLUTION_API_KEY,
+                    matches: apiKey === process.env.EVOLUTION_API_KEY,
                     headers: {
                         'x-api-key': req.headers['x-api-key'],
                         'apikey': req.headers['apikey']
                     },
                     query: req.query.apikey,
-                    body: req.body.apikey || (typeof req.body === 'string' ? req.body : undefined)
+                    body: typeof req.body === 'string' ? req.body : req.body.apikey
                 });
                 return res.status(401).json({ error: 'Unauthorized' });
             }
 
             // Parse body if it's a string
             const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+
+            // Log full request for debugging
+            console.log('Full request:', {
+                headers: req.headers,
+                query: req.query,
+                body: body
+            });
 
             // Validate webhook data
             if (!body.data || !body.data.message || !body.data.key) {

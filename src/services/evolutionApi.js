@@ -2,16 +2,20 @@ const axios = require('axios');
 
 class EvolutionApi {
     constructor() {
-        this.instance = process.env.EVOLUTION_INSTANCE || 'desafio';
-        this.baseURL = process.env.EVOLUTION_API_URL || 'https://evo.meuchatinteligente.com.br';
+        this.instance = process.env.EVOLUTION_INSTANCE;
+        this.baseURL = process.env.EVOLUTION_API_URL;
         this.apiKey = process.env.EVOLUTION_API_KEY;
+
+        if (!this.instance || !this.baseURL || !this.apiKey) {
+            throw new Error('Missing required Evolution API configuration');
+        }
 
         // Initialize axios instance
         this.api = axios.create({
             baseURL: this.baseURL,
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': this.apiKey
+                'x-api-key': this.apiKey
             }
         });
     }
@@ -33,6 +37,10 @@ class EvolutionApi {
                     text
                 }
             });
+
+            if (!response.data || response.data.error) {
+                throw new Error(response.data?.error || 'Failed to send message');
+            }
 
             return response;
         } catch (error) {
@@ -67,6 +75,10 @@ class EvolutionApi {
                     footerText
                 }
             });
+
+            if (!response.data || response.data.error) {
+                throw new Error(response.data?.error || 'Failed to send list message');
+            }
 
             return response;
         } catch (error) {

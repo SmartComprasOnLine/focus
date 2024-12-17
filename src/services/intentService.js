@@ -11,7 +11,7 @@ class IntentService {
     async detectIntent(message, userContext = {}) {
         try {
             const response = await this.openai.chat.completions.create({
-                model: process.env.OPENAI_MODEL || "gpt-4",
+                model: process.env.GPT_MODEL || "gpt-4",
                 messages: [
                     {
                         role: "system",
@@ -51,7 +51,7 @@ class IntentService {
     async analyzePlanUpdate(message, currentPlan) {
         try {
             const response = await this.openai.chat.completions.create({
-                model: process.env.OPENAI_MODEL || "gpt-4",
+                model: process.env.GPT_MODEL || "gpt-4",
                 messages: [
                     {
                         role: "system",
@@ -101,7 +101,7 @@ class IntentService {
     async extractActivityInfo(message) {
         try {
             const response = await this.openai.chat.completions.create({
-                model: process.env.OPENAI_MODEL || "gpt-4",
+                model: process.env.GPT_MODEL || "gpt-4",
                 messages: [
                     {
                         role: "system",
@@ -132,7 +132,7 @@ class IntentService {
     async analyzeRoutinePreferences(messages) {
         try {
             const response = await this.openai.chat.completions.create({
-                model: process.env.OPENAI_MODEL || "gpt-4",
+                model: process.env.GPT_MODEL || "gpt-4",
                 messages: [
                     {
                         role: "system",
@@ -168,7 +168,7 @@ class IntentService {
     async generateReminders(activity, preferences) {
         try {
             const response = await this.openai.chat.completions.create({
-                model: process.env.OPENAI_MODEL || "gpt-4",
+                model: process.env.GPT_MODEL || "gpt-4",
                 messages: [
                     {
                         role: "system",

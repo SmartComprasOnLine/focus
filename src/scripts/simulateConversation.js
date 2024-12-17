@@ -62,8 +62,12 @@ async function simulateMessage(user, message) {
         };
 
         await webhookController.handleWebhook({
+            headers: {
+                'x-api-key': process.env.EVOLUTION_API_KEY
+            },
             body: {
-                apikey: process.env.EVOLUTION_API_KEY,
+                event: 'messages.upsert',
+                instance: process.env.EVOLUTION_INSTANCE,
                 data: {
                     key: {
                         remoteJid: `${user.whatsappNumber}@s.whatsapp.net`,
@@ -74,10 +78,15 @@ async function simulateMessage(user, message) {
                     status: 'DELIVERY_ACK',
                     message: { conversation: message },
                     messageType: 'conversation',
-                    messageTimestamp: Date.now(),
-                    instanceId: '3c12b38a-6ccf-4a96-901f-4f8a73b188c0',
+                    messageTimestamp: Math.floor(Date.now() / 1000),
+                    instanceId: process.env.EVOLUTION_INSTANCE,
                     source: 'ios'
-                }
+                },
+                destination: process.env.MAIN_SERVICE_URL,
+                date_time: new Date().toISOString(),
+                sender: `${user.whatsappNumber}@s.whatsapp.net`,
+                server_url: process.env.EVOLUTION_API_URL,
+                apikey: process.env.EVOLUTION_API_KEY
             }
         }, res);
 

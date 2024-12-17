@@ -16,29 +16,44 @@ class WebhookController {
         try {
             const { message, user } = req.body;
 
+            // Validate user object
+            if (!user || !user._id) {
+                console.error('Invalid user object:', user);
+                return res.status(400).json({ error: 'Invalid user data' });
+            }
+
+            const userId = user._id.toString();
+
             // Clear any existing timeout for this user
-            if (this.messageTimeouts.has(user._id.toString())) {
-                clearTimeout(this.messageTimeouts.get(user._id.toString()));
+            if (this.messageTimeouts.has(userId)) {
+                clearTimeout(this.messageTimeouts.get(userId));
             }
 
             // Get or initialize pending messages for this user
-            const userMessages = this.pendingMessages.get(user._id.toString()) || [];
+            const userMessages = this.pendingMessages.get(userId) || [];
             userMessages.push(message);
-            this.pendingMessages.set(user._id.toString(), userMessages);
+            this.pendingMessages.set(userId, userMessages);
 
             // Set a new timeout
             const timeout = setTimeout(async () => {
-                // Get all pending messages
-                const messages = this.pendingMessages.get(user._id.toString()) || [];
-                // Clear pending messages
-                this.pendingMessages.delete(user._id.toString());
-                this.messageTimeouts.delete(user._id.toString());
+                try {
+                    // Get all pending messages
+                    const messages = this.pendingMessages.get(userId) || [];
+                    // Clear pending messages
+                    this.pendingMessages.delete(userId);
+                    this.messageTimeouts.delete(userId);
 
-                // Process concatenated messages
-                await this.processMessages(messages.join('\n'), user);
+                    // Process concatenated messages
+                    await this.processMessages(messages.join('\n'), user);
+                } catch (error) {
+                    console.error('Error processing messages:', error);
+                    await evolutionApi.sendText(user.whatsappNumber,
+                        'Desculpe, tive um problema ao processar sua mensagem. Por favor, tente novamente.'
+                    );
+                }
             }, 10000); // 10 seconds
 
-            this.messageTimeouts.set(user._id.toString(), timeout);
+            this.messageTimeouts.set(userId, timeout);
 
             // Send immediate response
             return res.json({ message: 'Message queued for processing' });

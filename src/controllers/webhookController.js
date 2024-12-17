@@ -19,15 +19,20 @@ class WebhookController {
                           req.headers['x-api-key'] || 
                           (req.body && req.body.apikey);
 
-            console.log('API key sources:', {
-                headerApiKey: req.headers['apikey'],
-                headerXApiKey: req.headers['x-api-key'],
-                bodyApiKey: req.body && req.body.apikey
+            // Convert API key to correct format if needed
+            const formattedApiKey = apiKey && apiKey.replace(/[^a-zA-Z0-9]/g, '');
+
+            console.log('API key details:', {
+                received: apiKey,
+                formatted: formattedApiKey,
+                expected: process.env.EVOLUTION_API_KEY,
+                matches: formattedApiKey === process.env.EVOLUTION_API_KEY
             });
 
-            if (!apiKey || apiKey !== process.env.EVOLUTION_API_KEY) {
+            if (!formattedApiKey || formattedApiKey !== process.env.EVOLUTION_API_KEY) {
                 console.error('Invalid API key:', {
                     received: apiKey,
+                    formatted: formattedApiKey,
                     expected: process.env.EVOLUTION_API_KEY,
                     headers: req.headers,
                     body: typeof req.body === 'string' ? 'String body' : 'Parsed body'

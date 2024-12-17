@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { connectDB, disconnectDB } = require('../config/database');
 const User = require('../models/User');
-const webhookController = require('../controllers/webhookController');
+const axios = require('axios');
 
 async function simulateMessage(user, message) {
     console.log(`\n=== Step ${stepCount}: Message ${messageCount} ===\n`);
@@ -9,49 +9,43 @@ async function simulateMessage(user, message) {
     messageHistory.push({ role: 'user', content: message });
     
     try {
-        // Create response object to capture messages
-        const responses = [];
-        const res = {
-            json: (data) => {
-                responses.push(data);
-                console.log('Response status: 200', 'data:', data);
+        // Create webhook payload like Evolution API
+        const webhookPayload = {
+            event: 'messages.upsert',
+            instance: process.env.EVOLUTION_INSTANCE,
+            data: {
+                key: {
+                    remoteJid: user.whatsappNumber,
+                    fromMe: false,
+                    id: Math.random().toString(36).substring(7)
+                },
+                pushName: user.name,
+                status: 'DELIVERY_ACK',
+                message: { conversation: message },
+                messageType: 'conversation',
+                messageTimestamp: Math.floor(Date.now() / 1000),
+                instanceId: process.env.EVOLUTION_INSTANCE,
+                source: 'ios'
             },
-            status: (code) => ({
-                json: (data) => {
-                    responses.push({ status: code, data });
-                    console.log('Response status:', code, 'data:', data);
-                }
-            })
+            destination: process.env.MAIN_SERVICE_URL,
+            date_time: new Date().toISOString(),
+            sender: user.whatsappNumber,
+            server_url: process.env.EVOLUTION_API_URL,
+            apikey: process.env.EVOLUTION_API_KEY
         };
 
-        await webhookController.handleWebhook({
+        // Send webhook request to local server
+        const response = await axios({
+            method: 'post',
+            url: 'http://localhost:3001/webhook',
             headers: {
-                'x-api-key': process.env.EVOLUTION_API_KEY
+                'Content-Type': 'application/json',
+                'apikey': process.env.EVOLUTION_API_KEY
             },
-            body: {
-                event: 'messages.upsert',
-                instance: process.env.EVOLUTION_INSTANCE,
-                data: {
-                    key: {
-                        remoteJid: user.whatsappNumber,
-                        fromMe: false,
-                        id: Math.random().toString(36).substring(7)
-                    },
-                    pushName: user.name,
-                    status: 'DELIVERY_ACK',
-                    message: { conversation: message },
-                    messageType: 'conversation',
-                    messageTimestamp: Math.floor(Date.now() / 1000),
-                    instanceId: process.env.EVOLUTION_INSTANCE,
-                    source: 'ios'
-                },
-                destination: process.env.MAIN_SERVICE_URL,
-                date_time: new Date().toISOString(),
-                sender: `${user.whatsappNumber}@s.whatsapp.net`,
-                server_url: process.env.EVOLUTION_API_URL,
-                apikey: process.env.EVOLUTION_API_KEY
-            }
-        }, res);
+            data: webhookPayload
+        });
+
+        console.log('Response status:', response.status, 'data:', response.data);
 
         // Print user status after each message
         console.log('\nUser Status:');

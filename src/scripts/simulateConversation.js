@@ -30,8 +30,7 @@ async function simulateMessage(user, message) {
             destination: process.env.MAIN_SERVICE_URL,
             date_time: new Date().toISOString(),
             sender: user.whatsappNumber,
-            server_url: process.env.EVOLUTION_API_URL,
-            apikey: process.env.EVOLUTION_API_KEY
+            server_url: process.env.EVOLUTION_API_URL
         };
 
         // Send webhook request to local server
@@ -95,7 +94,7 @@ async function runSimulation() {
 
         const messages = [
             // Initial contact
-            'Oi! Me falaram que vocês ajudam com TDAH',
+            'Oi! Me falaram que você pode me ajudar com produtividade',
             
             // Share routine
             `Minha rotina atual é assim:
@@ -122,9 +121,9 @@ async function runSimulation() {
             Música me ajuda a focar, principalmente lofi.
             Prefiro trabalhar de manhã quando a casa está silenciosa.`,
             
-            // Share medication info
-            `Tomo Ritalina de manhã, faz efeito por umas 4 horas.
-            O médico falou pra evitar cafeína depois das 16h.`,
+            // Share schedule info
+            `Preciso estar mais focado durante o horário comercial.
+            Queria ter mais energia depois do almoço.`,
             
             // Like the plan
             'Gostei muito do plano! Principalmente das pausas e lembretes',

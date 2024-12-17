@@ -1,44 +1,7 @@
-    require('dotenv').config();
+require('dotenv').config();
 const { connectDB, disconnectDB } = require('../config/database');
 const User = require('../models/User');
 const webhookController = require('../controllers/webhookController');
-
-// Override evolutionApi with mock
-const evolutionApi = require('../services/evolutionApi');
-evolutionApi.sendText = async (number, text) => {
-    console.log('SendText called with:', { number, text });
-    return {
-        status: 201,
-        data: {
-            key: {
-                remoteJid: `${number}@s.whatsapp.net`,
-                fromMe: true,
-                id: Math.random().toString(36).substring(7)
-            },
-            pushName: '',
-            status: 'PENDING',
-            message: { conversation: text },
-            contextInfo: null,
-            messageType: 'conversation',
-            messageTimestamp: Date.now(),
-            instanceId: '3c12b38a-6ccf-4a96-901f-4f8a73b188c0',
-            source: 'unknown'
-        }
-    };
-};
-
-evolutionApi.sendList = async (number, title, description, buttonText, sections, footerText, delay = 1000) => {
-    console.log('Sending list with data:', {
-        number,
-        title,
-        description,
-        buttonText,
-        sections,
-        footerText,
-        delay
-    });
-    return { status: 200, data: { message: 'Message processed successfully' } };
-};
 
 async function simulateMessage(user, message) {
     console.log(`\n=== Step ${stepCount}: Message ${messageCount} ===\n`);

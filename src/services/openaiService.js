@@ -11,7 +11,7 @@ class OpenAIService {
     async generateInitialPlan(name, message) {
         try {
             const response = await this.openai.chat.completions.create({
-                model: process.env.GPT_MODEL || "gpt-4",
+                model: process.env.OPENAI_MODEL,
                 messages: [
                     {
                         role: "system",
@@ -113,7 +113,7 @@ class OpenAIService {
     async generateResponse(name, message) {
         try {
             const response = await this.openai.chat.completions.create({
-                model: process.env.GPT_MODEL || "gpt-4",
+                model: process.env.OPENAI_MODEL,
                 messages: [
                     {
                         role: "system",
@@ -143,7 +143,7 @@ class OpenAIService {
     async generatePlanSummary(name, routine) {
         try {
             const response = await this.openai.chat.completions.create({
-                model: process.env.GPT_MODEL || "gpt-4",
+                model: process.env.OPENAI_MODEL,
                 messages: [
                     {
                         role: "system",
@@ -180,7 +180,7 @@ class OpenAIService {
     async generateActivityFeedback(name, success = true) {
         try {
             const response = await this.openai.chat.completions.create({
-                model: process.env.GPT_MODEL || "gpt-4",
+                model: process.env.OPENAI_MODEL,
                 messages: [
                     {
                         role: "system",

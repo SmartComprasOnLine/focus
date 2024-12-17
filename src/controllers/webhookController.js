@@ -108,7 +108,7 @@ class WebhookController {
             // For new users, send welcome message immediately
             if (!user.welcomeSent) {
                 const welcomeMessage = `*Olá ${user.name}!* 👋\n\n` +
-                    '*Bem-vindo ao Focus, seu assistente pessoal para TDAH!* 🌟\n\n' +
+                    '*Eu sou Rita, sua assistente pessoal!* 🌟\n\n' +
                     '*Estou aqui para te ajudar a:*\n' +
                     '• Criar e manter rotinas 📅\n' +
                     '• Gerenciar tarefas e lembretes ⏰\n' +

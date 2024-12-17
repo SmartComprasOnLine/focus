@@ -4,6 +4,7 @@ const subscriptionController = require('./subscriptionController');
 const openaiService = require('../services/openaiService');
 const evolutionApi = require('../services/evolutionApi');
 const User = require('../models/User');
+const Routine = require('../models/Routine');
 
 class WebhookController {
     constructor() {
@@ -113,7 +114,8 @@ class WebhookController {
                     '• Criar e manter rotinas 📅\n' +
                     '• Gerenciar tarefas e lembretes ⏰\n' +
                     '• Melhorar seu foco e produtividade 🎯\n\n' +
-                    '_Me conte um pouco sobre sua rotina atual para começarmos!_ 💪';
+                    '_Me conte um pouco sobre sua rotina atual para começarmos!_ 💪\n\n' +
+                    '_Obs: Se precisar apagar seus dados, basta enviar "apagar meus dados"._';
                 
                 await evolutionApi.sendText(user.whatsappNumber, welcomeMessage);
                 await user.addToMessageHistory('assistant', welcomeMessage);
@@ -145,6 +147,24 @@ class WebhookController {
 
                 let response;
                 switch (intent) {
+                    case 'delete_data': {
+                        // Delete user's routines
+                        if (user.activeRoutineId) {
+                            await Routine.deleteMany({ userId: user._id });
+                        }
+                        
+                        // Delete user
+                        await User.deleteOne({ _id: user._id });
+
+                        // Send confirmation message
+                        const deleteMessage = '*Seus dados foram apagados com sucesso.* 🗑️\n\n' +
+                            '_Todas as suas informações foram removidas do nosso banco de dados._\n\n' +
+                            'Se quiser voltar a usar o serviço, é só me mandar uma mensagem! 👋';
+                        
+                        await evolutionApi.sendText(user.whatsappNumber, deleteMessage);
+                        break;
+                    }
+
                     case 'create_plan':
                         await routineController.createInitialPlan(user, { initialMessage: message });
                         break;

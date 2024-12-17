@@ -10,6 +10,15 @@ class IntentService {
 
     async detectIntent(message, userContext = {}) {
         try {
+            // Check for direct commands first
+            const lowerMessage = message.toLowerCase().trim();
+            if (lowerMessage === 'apagar meus dados' || 
+                lowerMessage === 'deletar meus dados' || 
+                lowerMessage === 'excluir meus dados' ||
+                lowerMessage === 'remover meus dados') {
+                return 'delete_data';
+            }
+
             const response = await this.openai.chat.completions.create({
                 model: process.env.OPENAI_MODEL,
                 messages: [

@@ -195,6 +195,20 @@ class WebhookController {
                         break;
                     }
 
+                    case 'delete_data': {
+                        // Delete user's routine if exists
+                        if (user.activeRoutineId) {
+                            await Routine.findByIdAndDelete(user.activeRoutineId);
+                        }
+                        
+                        // Delete user
+                        await User.findByIdAndDelete(user._id);
+                        
+                        const deleteMessage = `Seus dados foram apagados com sucesso, ${user.name}. Se quiser voltar a usar o serviço, é só mandar uma mensagem. 👋`;
+                        await evolutionApi.sendText(user.whatsappNumber, deleteMessage);
+                        break;
+                    }
+
                     default: {
                         // Generate contextual response
                         response = await openaiService.generateResponse(user.name, message, messageHistory);

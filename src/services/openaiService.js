@@ -3,265 +3,211 @@ require('dotenv').config();
 
 class OpenAIService {
     constructor() {
-        if (!process.env.OPENAI_API_KEY) {
-            throw new Error('OPENAI_API_KEY environment variable is required');
-        }
-
         this.openai = new OpenAI({
             apiKey: process.env.OPENAI_API_KEY
         });
-
-        this.systemPrompt = `
-            Você é um coach pessoal especializado em TDAH focado em ajudar {userName} a melhorar sua produtividade, 
-            foco e disposição. Seu objetivo é auxiliar na organização da rotina diária do usuário.
-            
-            Diretrizes:
-            1. Mantenha respostas curtas e objetivas
-            2. Use emojis para tornar a comunicação mais engajadora
-            3. Foque em soluções práticas e alcançáveis
-            4. Divida tarefas complexas em etapas menores
-            5. Ofereça sugestões específicas baseadas no contexto do usuário
-            6. Mantenha um tom motivador e compreensivo
-            7. Evite sobrecarregar o usuário com muitas tarefas
-        `;
     }
 
-    async generateResponse(userName, userMessage, currentPlan = null, interactionHistory = []) {
+    async generateInitialPlan(name, message) {
         try {
-            const messages = [
-                {
-                    role: 'system',
-                    content: this.systemPrompt.replace('{userName}', userName)
-                }
-            ];
+            const response = await this.openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL || "gpt-4",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are a personal coach specializing in ADHD. Create a personalized daily routine plan based on the user's input.
+                        For each activity, you must specify:
+                        - time: in HH:mm format
+                        - task: clear description of the activity
+                        - duration: in minutes (minimum 5 minutes, maximum 240 minutes per segment)
+                        - reminders: motivational messages for before, start, during, end, and follow-up
 
-            // Add interaction history
-            if (interactionHistory && interactionHistory.length > 0) {
-                const recentHistory = interactionHistory.slice(-5); // Get last 5 interactions
-                recentHistory.forEach(interaction => {
-                    messages.push({
-                        role: interaction.role,
-                        content: interaction.content
-                    });
-                });
-            }
-
-            // Add current plan context if available
-            if (currentPlan) {
-                messages.push({
-                    role: 'system',
-                    content: `Plano atual do usuário: ${JSON.stringify(currentPlan, null, 2)}`
-                });
-            }
-
-            // Add user's current message
-            messages.push({
-                role: 'user',
-                content: userMessage
-            });
-
-            const completion = await this.openai.chat.completions.create({
-                model: process.env.GPT_MODEL || 'gpt-4',
-                messages: messages,
-                temperature: 0.7,
-                max_tokens: 500
-            });
-
-            return completion.choices[0].message.content;
-        } catch (error) {
-            console.error('Error generating OpenAI response:', error);
-            throw error;
-        }
-    }
-
-    async generateInitialPlan(userName, userResponses) {
-        try {
-            const messages = [
-                {
-                    role: 'system',
-                    content: `
-                        Você é um coach especializado em TDAH criando um plano personalizado para ${userName}.
-                        Seu objetivo é criar um plano diário com atividades e lembretes que ajudem o usuário a:
-                        1. Manter uma rotina estruturada
-                        2. Gerenciar melhor seu tempo
-                        3. Manter o foco nas tarefas
-                        4. Incluir pausas estratégicas
-                        5. Celebrar conquistas
-
-                        Retorne um objeto JSON com esta estrutura exata:
+                        Return the plan in this exact JSON format:
                         {
-                            "plan": "Descrição do plano em texto",
-                            "reminders": [
+                            "activities": [
                                 {
-                                    "activity": "Nome da atividade",
-                                    "scheduledTime": "HH:mm",
-                                    "type": "planejamento|trabalho|estudo|pausa|revisão",
-                                    "messages": {
-                                        "before": "Mensagem 5 minutos antes",
-                                        "start": "Mensagem no início",
-                                        "during": "Mensagem durante",
-                                        "after": "Mensagem após"
+                                    "time": "HH:mm",
+                                    "task": "Task description",
+                                    "duration": number_between_5_and_240,
+                                    "reminders": {
+                                        "before": "Reminder message",
+                                        "start": "Start message",
+                                        "during": ["During message"],
+                                        "end": "End message",
+                                        "followUp": "Follow-up message"
                                     }
                                 }
                             ]
                         }
 
-                        Mantenha o plano realista e alcançável, com no máximo 6-8 atividades por dia.
-                        Use emojis para tornar as mensagens mais engajadoras.
-                        Inclua pausas regulares usando a técnica Pomodoro (25 min trabalho, 5 min pausa).
-                        
-                        IMPORTANTE: Retorne APENAS o objeto JSON, sem texto adicional.
-                    `
-                },
-                {
-                    role: 'user',
-                    content: userResponses.initialMessage || ''
-                }
-            ];
-
-            // Add previous responses if available
-            if (userResponses.previousResponses) {
-                userResponses.previousResponses.forEach(response => {
-                    if (response.role === 'user') {
-                        messages.push({
-                            role: 'user',
-                            content: response.content
-                        });
+                        Important rules:
+                        1. Every activity must have a duration between 5 and 240 minutes
+                        2. Long activities (>4 hours) should be split into multiple segments
+                        3. Include breaks and transitions between activities
+                        4. Reminders should be motivational and include emojis
+                        5. Consider ADHD challenges when scheduling activities`
+                    },
+                    {
+                        role: "user",
+                        content: `Create a plan for ${name} based on: ${message}`
                     }
-                });
-            }
-
-            const completion = await this.openai.chat.completions.create({
-                model: process.env.GPT_MODEL || 'gpt-4',
-                messages: messages,
+                ],
                 temperature: 0.7,
-                max_tokens: 2000,
                 response_format: { type: "json_object" }
             });
 
-            console.log('OpenAI Response:', completion.choices[0].message.content);
-            
-            try {
-                const result = JSON.parse(completion.choices[0].message.content);
-                if (!result.plan || !Array.isArray(result.reminders)) {
-                    throw new Error('Invalid response format');
+            const plan = JSON.parse(response.choices[0].message.content);
+
+            // Validate and adjust durations
+            plan.activities = plan.activities.map(activity => {
+                // Ensure minimum duration
+                activity.duration = Math.max(5, activity.duration || 30);
+                
+                // Split long activities into segments
+                if (activity.duration > 240) {
+                    const segments = [];
+                    let remainingDuration = activity.duration;
+                    let currentTime = activity.time;
+
+                    while (remainingDuration > 0) {
+                        const segmentDuration = Math.min(remainingDuration, 240);
+                        segments.push({
+                            time: currentTime,
+                            task: `${activity.task} (Part ${segments.length + 1})`,
+                            duration: segmentDuration,
+                            reminders: {
+                                before: `Prepare-se para continuar ${activity.task}!`,
+                                start: `Hora de continuar ${activity.task}!`,
+                                during: [`Continue focado em ${activity.task}!`],
+                                end: segments.length === Math.ceil(activity.duration / 240) - 1 
+                                    ? `Hora de finalizar ${activity.task}!`
+                                    : `Hora de fazer uma pausa de ${activity.task}!`,
+                                followUp: segments.length === Math.ceil(activity.duration / 240) - 1
+                                    ? `Parabéns por completar ${activity.task}!`
+                                    : `Aproveite sua pausa!`
+                            }
+                        });
+
+                        remainingDuration -= segmentDuration;
+                        // Calculate next segment start time
+                        const [hours, minutes] = currentTime.split(':').map(Number);
+                        const nextTime = new Date(2024, 0, 1, hours, minutes + segmentDuration + 15);
+                        currentTime = nextTime.toTimeString().slice(0, 5);
+                    }
+                    return segments;
                 }
-                return {
-                    plan: result.plan,
-                    reminders: result.reminders
-                };
-            } catch (parseError) {
-                console.error('Error parsing OpenAI response:', parseError);
-                console.error('Response content:', completion.choices[0].message.content);
-                throw new Error('Failed to parse plan from OpenAI response');
-            }
+
+                return activity;
+            });
+
+            // Flatten segments array
+            plan.activities = plan.activities.flat();
+
+            return plan;
         } catch (error) {
             console.error('Error generating initial plan:', error);
             throw error;
         }
     }
 
-    async analyzePlanProgress(currentPlan, completedTasks, feedback) {
+    async generateResponse(name, message) {
         try {
-            const messages = [
-                {
-                    role: 'system',
-                    content: `
-                        Você é um coach especializado em TDAH analisando o progresso do plano do usuário.
-                        Analise as tarefas completadas e o feedback para gerar sugestões de ajustes.
-                        Mantenha um tom motivador e construtivo.
-                        Use emojis para tornar a mensagem mais engajadora.
-                    `
-                },
-                {
-                    role: 'user',
-                    content: `
-                        Plano atual: ${JSON.stringify(currentPlan, null, 2)}
-                        Tarefas completadas: ${JSON.stringify(completedTasks, null, 2)}
-                        Feedback do usuário: ${feedback}
-                    `
-                }
-            ];
-
-            const completion = await this.openai.chat.completions.create({
-                model: process.env.GPT_MODEL || 'gpt-4',
-                messages: messages,
-                temperature: 0.7,
-                max_tokens: 500
-            });
-
-            return completion.choices[0].message.content;
-        } catch (error) {
-            console.error('Error analyzing plan progress:', error);
-            throw error;
-        }
-    }
-
-    async generateDailyMotivation(userName, progress) {
-        try {
-            const messages = [
-                {
-                    role: 'system',
-                    content: `
-                        Você é um coach motivacional especializado em TDAH.
-                        Gere uma mensagem motivacional personalizada para ${userName} com base em seu progresso:
-                        - Atividades completadas: ${progress.completedActivities}
-                        - Total de atividades: ${progress.totalActivities}
-                        - Taxa de conclusão: ${progress.completionRate.toFixed(1)}%
-
-                        Use emojis e mantenha um tom positivo e encorajador.
-                        Foque em celebrar o progresso e motivar para as próximas atividades.
-                    `
-                }
-            ];
-
-            const completion = await this.openai.chat.completions.create({
-                model: process.env.GPT_MODEL || 'gpt-4',
-                messages: messages,
-                temperature: 0.7,
-                max_tokens: 300
-            });
-
-            return completion.choices[0].message.content;
-        } catch (error) {
-            console.error('Error generating daily motivation:', error);
-            throw error;
-        }
-    }
-
-    async analyzeIntent(message) {
-        try {
-            const completion = await this.openai.chat.completions.create({
-                model: process.env.GPT_MODEL || 'gpt-4',
+            const response = await this.openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL || "gpt-4",
                 messages: [
                     {
-                        role: 'system',
-                        content: `
-                            Você é um analisador de intenções. Sua tarefa é identificar a intenção principal 
-                            na mensagem do usuário. Retorne apenas uma das seguintes opções:
-                            
-                            - SUBSCRIPTION_INQUIRY: Usuário pergunta sobre assinatura, preços, ou como continuar usando
-                            - WELCOME: Primeira mensagem ou pedido de ajuda inicial
-                            - ROUTINE_HELP: Pedido de ajuda com organização ou rotina
-                            - PAYMENT_CONFIRMATION: Menção a pagamento ou comprovante
-                            - NONE: Se nenhuma das opções acima corresponder
-                            
-                            Retorne apenas o identificador, sem explicações adicionais.
-                        `
+                        role: "system",
+                        content: `You are a personal coach specializing in ADHD. Your responses must be:
+                        1. In Portuguese
+                        2. Very concise (max 3 short paragraphs)
+                        3. Direct and practical
+                        4. Use emojis sparingly (max 2-3)
+                        5. Focus on one key message or tip
+                        6. Keep encouragement brief but meaningful`
                     },
                     {
-                        role: 'user',
-                        content: message
+                        role: "user",
+                        content: `User ${name} says: ${message}`
                     }
                 ],
-                temperature: 0,
-                max_tokens: 50
+                temperature: 0.7
             });
 
-            return completion.choices[0].message.content.trim();
+            return response.choices[0].message.content;
         } catch (error) {
-            console.error('Error analyzing intent:', error);
-            return 'NONE';
+            console.error('Error generating response:', error);
+            throw error;
+        }
+    }
+
+    async generatePlanSummary(name, routine) {
+        try {
+            const response = await this.openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL || "gpt-4",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are a personal coach specializing in ADHD. Create a minimal schedule:
+                        1. Three sections only:
+                           🌅 Manhã
+                           07:00 Acordar
+                           
+                           🌞 Tarde
+                           12:00 Almoço
+                           
+                           🌙 Noite
+                           22:00 Dormir
+                        2. Max 3 activities per section
+                        3. Use format "HH:MM Atividade"
+                        4. Single word activities in Portuguese
+                        5. One line motivation in Portuguese`
+                    },
+                    {
+                        role: "user",
+                        content: `Create a summary for ${name}'s plan: ${JSON.stringify(routine)}`
+                    }
+                ],
+                temperature: 0.7
+            });
+
+            return response.choices[0].message.content;
+        } catch (error) {
+            console.error('Error generating plan summary:', error);
+            throw error;
+        }
+    }
+
+    async generateActivityFeedback(name, success = true) {
+        try {
+            const response = await this.openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL || "gpt-4",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are a personal coach specializing in ADHD. ${
+                            success 
+                                ? 'Generate a brief positive message in Portuguese for activity completion.' 
+                                : 'Generate a brief supportive message in Portuguese for missing an activity.'
+                        }
+                        Your response must:
+                        1. Be just 1-2 short sentences in Portuguese
+                        2. Use maximum 1 emoji
+                        3. Focus on moving forward
+                        4. Avoid lengthy explanations
+                        5. Keep encouragement simple and direct`
+                    },
+                    {
+                        role: "user",
+                        content: `Generate ${success ? 'positive' : 'supportive'} feedback for ${name}`
+                    }
+                ],
+                temperature: 0.7
+            });
+
+            return response.choices[0].message.content;
+        } catch (error) {
+            console.error('Error generating activity feedback:', error);
+            throw error;
         }
     }
 }

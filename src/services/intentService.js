@@ -1,152 +1,225 @@
-const openai = require('./openaiService');
+const { OpenAI } = require('openai');
+require('dotenv').config();
 
 class IntentService {
     constructor() {
-        this.predefinedMessages = {
-            SUBSCRIPTION_INQUIRY: {
-                intent: "Usuário pergunta sobre assinatura, preços, ou como continuar usando o sistema",
-                response: async (params) => {
-                    const monthlyPrice = params.monthlyPrice || '99.00';
-                    const yearlyPrice = params.yearlyPrice || '999.00';
-                    return {
-                        type: 'list',
-                        title: "Escolha seu plano",
-                        description: "Para continuar tendo acesso e manter seu progresso, escolha um plano:",
-                        buttonText: "Ver Planos",
-                        sections: [{
-                            title: "Planos Disponíveis",
-                            rows: [
-                                {
-                                    title: "Plano Mensal",
-                                    description: `R$ ${monthlyPrice}/mês - Acesso a todas as funcionalidades`,
-                                    rowId: "plano_mensal"
-                                },
-                                {
-                                    title: "Plano Anual",
-                                    description: `R$ ${yearlyPrice}/ano - Economia de 2 meses!`,
-                                    rowId: "plano_anual"
-                                }
-                            ]
-                        }]
-                    };
-                }
-            },
-            WELCOME: {
-                intent: "Primeira mensagem do usuário ou pedido de ajuda inicial",
-                response: async (params) => {
-                    const userName = params.userName || 'Olá';
-                    return {
-                        type: 'text',
-                        content: `${userName}! 👋\n\n` +
-                                `Bem-vindo ao seu Coach Pessoal para TDAH! 🌟\n\n` +
-                                `Estou aqui para ajudar você a:\n` +
-                                `✅ Organizar sua rotina\n` +
-                                `✅ Melhorar seu foco\n` +
-                                `✅ Aumentar sua produtividade\n` +
-                                `✅ Manter sua disposição\n\n` +
-                                `Você tem 7 dias GRATUITOS para experimentar todas as funcionalidades!\n\n` +
-                                `Vamos começar? Me conte um pouco sobre sua rotina atual. 😊`
-                    };
-                }
-            },
-            ROUTINE_HELP: {
-                intent: "Usuário pede ajuda com organização de rotina ou menciona dificuldades com tarefas diárias",
-                response: async (params) => {
-                    const userName = params.userName || 'Olá';
-                    return {
-                        type: 'text',
-                        content: `${userName}, vou te ajudar a organizar sua rotina! 🎯\n\n` +
-                                `Para começarmos, me conte:\n\n` +
-                                `1️⃣ Que horas você costuma acordar?\n` +
-                                `2️⃣ Quais são suas principais atividades diárias?\n` +
-                                `3️⃣ Em quais momentos você sente mais dificuldade de manter o foco?\n\n` +
-                                `Com essas informações, poderei criar um plano personalizado para você! 💪`
-                    };
-                }
-            },
-            PAYMENT_CONFIRMATION: {
-                intent: "Usuário menciona que fez o pagamento ou enviou comprovante",
-                response: async (params) => {
-                    try {
-                        const monthlyPrice = params.monthlyPrice || '99.00';
-                        const yearlyPrice = params.yearlyPrice || '999.00';
-                        const planTypes = {
-                            mensal: {
-                                period: '1 mês',
-                                price: monthlyPrice
-                            },
-                            anual: {
-                                period: '1 ano',
-                                price: yearlyPrice
-                            }
-                        };
-
-                        const normalizedPlanType = (params.planType || 'anual').toLowerCase();
-                        
-                        if (!planTypes[normalizedPlanType]) {
-                            throw new Error(`Invalid plan type: ${normalizedPlanType}`);
-                        }
-
-                        const plan = planTypes[normalizedPlanType];
-                        const capitalizedPlanType = normalizedPlanType.charAt(0).toUpperCase() + normalizedPlanType.slice(1);
-                        const endDate = params.endDate || 'em processamento';
-
-                        return {
-                            type: 'text',
-                            content: `🎉 Pagamento confirmado!\n\n` +
-                                    `Seu Plano ${capitalizedPlanType} foi ativado com sucesso!\n` +
-                                    `Valor: R$ ${plan.price}/${normalizedPlanType === 'mensal' ? 'mês' : 'ano'}\n` +
-                                    `Período: ${plan.period}\n` +
-                                    `Validade: ${endDate}\n\n` +
-                                    `Continue contando comigo para organizar sua rotina e melhorar seu foco! 💪✨`
-                        };
-                    } catch (error) {
-                        console.error('Error generating payment confirmation:', error);
-                        return {
-                            type: 'text',
-                            content: `🎉 Pagamento confirmado!\n\n` +
-                                    `Seu plano foi ativado com sucesso!\n` +
-                                    `Validade: ${params.endDate || 'em processamento'}\n\n` +
-                                    `Continue contando comigo para organizar sua rotina e melhorar seu foco! 💪✨`
-                        };
-                    }
-                }
-            }
-        };
+        this.openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY
+        });
     }
 
-    async analyzeIntent(message, userName) {
+    async detectIntent(message, userContext = {}) {
         try {
-            const prompt = `
-                Analise a mensagem do usuário e identifique a intenção principal. Compare com as seguintes intenções predefinidas e retorne a mais apropriada, ou 'NONE' se nenhuma corresponder:
+            const response = await this.openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL || "gpt-4",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are an intent detection system for a ADHD coaching app. 
+                        Analyze the user message and return one of these intents:
+                        - create_plan: When user wants to create their initial routine plan
+                        - update_plan: When user wants to modify their existing plan (add/remove/change activities or reminders)
+                        - show_plan: When user wants to see their current plan or routine
+                        - activity_completed: When user indicates they completed an activity
+                        - activity_not_completed: When user indicates they couldn't complete an activity
+                        - subscription_inquiry: When user asks about plans, pricing, or continuing after trial
+                        - select_plan: When user chooses a subscription plan
+                        - goodbye: When user is saying goodbye or thanking
+                        - general_conversation: For any other type of conversation
 
-                Intenções disponíveis:
-                ${Object.entries(this.predefinedMessages)
-                    .map(([key, value]) => `${key}: ${value.intent}`)
-                    .join('\n')}
+                        Context about the user's current plan status:
+                        ${JSON.stringify(userContext)}
+                        
+                        Return ONLY the intent name, nothing else.`
+                    },
+                    {
+                        role: "user",
+                        content: message
+                    }
+                ],
+                temperature: 0.3,
+                max_tokens: 50
+            });
 
-                Mensagem do usuário: "${message}"
-
-                Retorne apenas o identificador da intenção (ex: SUBSCRIPTION_INQUIRY) ou 'NONE'.
-            `;
-
-            const response = await openai.generateResponse(userName, prompt);
-            return response.trim();
+            return response.choices[0].message.content.trim().toLowerCase();
         } catch (error) {
-            console.error('Error analyzing intent:', error);
-            return 'NONE';
+            console.error('Error detecting intent:', error);
+            throw error;
         }
     }
 
-    async getResponseForIntent(intent, params = {}) {
-        const message = this.predefinedMessages[intent];
-        if (!message) return null;
-
+    async analyzePlanUpdate(message, currentPlan) {
         try {
-            return await message.response(params);
+            const response = await this.openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL || "gpt-4",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are a plan update analyzer for a ADHD coaching app.
+                        Analyze the user's message to identify requested changes to their routine plan.
+                        Current plan:
+                        ${JSON.stringify(currentPlan, null, 2)}
+
+                        Return a JSON object with:
+                        {
+                            "type": "add" | "modify" | "remove",
+                            "activities": [{
+                                "id": string (if modifying/removing),
+                                "time": string (HH:mm format),
+                                "task": string,
+                                "duration": number (minutes),
+                                "changes": {
+                                    "field": "what changed",
+                                    "from": "old value",
+                                    "to": "new value"
+                                }
+                            }],
+                            "reminders": [{
+                                "activityId": string,
+                                "type": "before" | "start" | "during" | "end" | "followUp",
+                                "message": string,
+                                "time": string (HH:mm format)
+                            }]
+                        }`
+                    },
+                    {
+                        role: "user",
+                        content: message
+                    }
+                ],
+                temperature: 0.7,
+                response_format: { type: "json_object" }
+            });
+
+            return JSON.parse(response.choices[0].message.content);
         } catch (error) {
-            console.error('Error getting response for intent:', error);
-            return null;
+            console.error('Error analyzing plan update:', error);
+            throw error;
+        }
+    }
+
+    async extractActivityInfo(message) {
+        try {
+            const response = await this.openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL || "gpt-4",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are an activity information extractor for a ADHD coaching app.
+                        Analyze the user message and extract:
+                        - Activity ID if present (usually in format 'completed_ID' or 'not_completed_ID')
+                        - Plan type if present (usually 'mensal' or 'anual')
+                        - Activity details (time, task, duration) if present
+                        
+                        Return the extracted information in a JSON format, or 'null' if no relevant information found.`
+                    },
+                    {
+                        role: "user",
+                        content: message
+                    }
+                ],
+                temperature: 0.3,
+                response_format: { type: "json_object" }
+            });
+
+            return JSON.parse(response.choices[0].message.content);
+        } catch (error) {
+            console.error('Error extracting activity info:', error);
+            throw error;
+        }
+    }
+
+    async analyzeRoutinePreferences(messages) {
+        try {
+            const response = await this.openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL || "gpt-4",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are a routine preference analyzer for a ADHD coaching app.
+                        Analyze the user's messages and identify:
+                        - Productive periods (when they feel most focused/energetic)
+                        - Challenges they face
+                        - Strategies that help them
+                        - Common distractions
+                        - Medication schedule if mentioned
+                        - Sleep patterns
+                        - Work/study schedule
+                        - Exercise/physical activity habits
+                        
+                        Return the analysis in a structured JSON format that can be used to create personalized reminders and recommendations.`
+                    },
+                    {
+                        role: "user",
+                        content: Array.isArray(messages) ? messages.join('\n') : messages
+                    }
+                ],
+                temperature: 0.7,
+                response_format: { type: "json_object" }
+            });
+
+            return JSON.parse(response.choices[0].message.content);
+        } catch (error) {
+            console.error('Error analyzing routine preferences:', error);
+            throw error;
+        }
+    }
+
+    async generateReminders(activity, preferences) {
+        try {
+            const response = await this.openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL || "gpt-4",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are a reminder generator for a ADHD coaching app.
+                        Based on the activity and user preferences, generate personalized reminders that:
+                        - Are motivating and encouraging
+                        - Consider the user's peak productivity times
+                        - Account for their challenges and distractions
+                        - Incorporate their helpful strategies
+                        - Include relevant emojis
+                        
+                        Return the reminders in a JSON format with:
+                        {
+                            "before": {
+                                "message": string,
+                                "time": "HH:mm"
+                            },
+                            "start": {
+                                "message": string,
+                                "time": "HH:mm"
+                            },
+                            "during": [{
+                                "message": string,
+                                "time": "HH:mm"
+                            }],
+                            "end": {
+                                "message": string,
+                                "time": "HH:mm"
+                            },
+                            "followUp": {
+                                "message": string,
+                                "time": "HH:mm"
+                            }
+                        }`
+                    },
+                    {
+                        role: "user",
+                        content: JSON.stringify({
+                            activity: activity,
+                            preferences: preferences
+                        })
+                    }
+                ],
+                temperature: 0.7,
+                response_format: { type: "json_object" }
+            });
+
+            return JSON.parse(response.choices[0].message.content);
+        } catch (error) {
+            console.error('Error generating reminders:', error);
+            throw error;
         }
     }
 }

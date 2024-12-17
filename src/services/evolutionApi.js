@@ -26,6 +26,16 @@ class EvolutionApi {
             console.log('Current instance:', this.instance);
             console.log('Current baseURL:', this.baseURL);
             console.log('Request URL:', `/message/sendText/${this.instance}`);
+            console.log('Request body:', {
+                number,
+                options: {
+                    delay: 1000,
+                    presence: 'composing'
+                },
+                textMessage: {
+                    text
+                }
+            });
 
             const response = await this.api.post(`/message/sendText/${this.instance}`, {
                 number: number,

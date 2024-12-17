@@ -4,18 +4,24 @@ services:
     restart: always
     env_file:
       - .env
+    ports:
+      - "3001:3001"
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_started
     networks:
       - focus_network
 
   mongodb:
     image: mongo:latest
     restart: always
+    ports:
+      - "27017:27017"
     volumes:
       - mongodb_data:/data/db
     networks:
       - focus_network
+    command: mongod --bind_ip_all
 
 networks:
   focus_network:

@@ -193,15 +193,15 @@ async function runSimulation() {
             stepCount++;
             messageCount++;
             await simulateMessage(user, message);
-            // Add longer delay between messages to simulate real conversation
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            // Add 15-second delay between messages to simulate real conversation
+            await new Promise(resolve => setTimeout(resolve, 15000));
         }
 
     } catch (error) {
         console.error('Error in simulation:', error);
     } finally {
-        // Wait for all messages to be processed (15 messages * 5 seconds + 10 seconds timeout + buffer)
-        await new Promise(resolve => setTimeout(resolve, 15 * 5000 + 10000 + 5000));
+        // Wait for all messages to be processed (15 messages * 15 seconds + 10 seconds timeout + buffer)
+        await new Promise(resolve => setTimeout(resolve, 15 * 15000 + 10000 + 5000));
         
         await disconnectDB();
         console.log('Database connection closed');

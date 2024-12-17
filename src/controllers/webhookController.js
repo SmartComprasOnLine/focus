@@ -14,12 +14,29 @@ class WebhookController {
 
     async handleWebhook(req, res) {
         try {
-            const { message, user } = req.body;
+            const { message, number } = req.body;
 
-            // Validate user object
-            if (!user || !user._id) {
-                console.error('Invalid user object:', user);
-                return res.status(400).json({ error: 'Invalid user data' });
+            // Validate required fields
+            if (!message || !number) {
+                console.error('Invalid webhook data:', req.body);
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+
+            // Find or create user
+            let user = await User.findOne({ whatsappNumber: number });
+            if (!user) {
+                // Extract name from number (temporary until we get proper user data)
+                const name = `User ${number.slice(-4)}`;
+                user = await User.create({
+                    name,
+                    whatsappNumber: number,
+                    timezone: 'America/Sao_Paulo',
+                    subscription: {
+                        status: 'em_teste',
+                        trialStartDate: new Date(),
+                        trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                    }
+                });
             }
 
             const userId = user._id.toString();

@@ -1,4 +1,4 @@
-require('dotenv').config();
+    require('dotenv').config();
 const { connectDB, disconnectDB } = require('../config/database');
 const User = require('../models/User');
 const webhookController = require('../controllers/webhookController');
@@ -193,15 +193,15 @@ async function runSimulation() {
             stepCount++;
             messageCount++;
             await simulateMessage(user, message);
-            // Add small delay between messages to simulate typing
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Add longer delay between messages to simulate real conversation
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
 
     } catch (error) {
         console.error('Error in simulation:', error);
     } finally {
-        // Wait for any pending timeouts (10 seconds + buffer)
-        await new Promise(resolve => setTimeout(resolve, 11000));
+        // Wait for all messages to be processed (15 messages * 5 seconds + 10 seconds timeout + buffer)
+        await new Promise(resolve => setTimeout(resolve, 15 * 5000 + 10000 + 5000));
         
         await disconnectDB();
         console.log('Database connection closed');

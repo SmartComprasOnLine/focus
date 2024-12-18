@@ -3,6 +3,7 @@ const openaiService = require('../services/openaiService');
 const evolutionApi = require('../services/evolutionApi');
 const reminderService = require('../services/reminderService');
 const timezoneService = require('../services/timezoneService');
+const intentService = require('../services/intentService');
 
 class RoutineController {
   async createInitialPlan(user, { initialMessage }) {

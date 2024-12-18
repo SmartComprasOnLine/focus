@@ -158,12 +158,15 @@ class RoutineController {
       // Update reminders for the modified routine
       await reminderService.setupReminders(user, routine);
 
-      // Send confirmation message
-      const confirmMessage = `*Plano atualizado com sucesso!* ✅\n\nVou te mostrar como ficou:`;
-      await evolutionApi.sendText(user.whatsappNumber, confirmMessage);
+      // Format activities for WhatsApp
+      const formattedActivities = routine.activities.map(a => 
+        `⏰ *${a.scheduledTime}* - _${a.activity}_ (${a.duration}min)`
+      ).join('\n');
+
+      // Send confirmation message with full plan
+      const confirmMessage = `*Plano atualizado com sucesso!* ✅\n\n${formattedActivities}\n\nConfigurei lembretes para ajudar você a seguir o plano. Você receberá notificações nos horários programados. ⏰\n\nVamos começar? Responda "sim" para confirmar ou me diga se precisar de ajustes. 😊`;
       
-      // Show updated plan
-      await this.getPlanSummary(user);
+      await evolutionApi.sendText(user.whatsappNumber, confirmMessage);
 
     } catch (error) {
       console.error('Error updating plan:', error);

@@ -19,12 +19,25 @@ class OpenAIService {
             // Verifica se é a primeira mensagem (sem histórico)
             const isFirstMessage = messageHistory.length === 1;
 
-            const systemPrompt = isFirstMessage
-                ? `Você é Rita, uma assistente pessoal especializada em produtividade, gestão de tempo e bem estar. Esta é a primeira interação com ${name}.
-                
-                Responda exatamente com esta mensagem (substituindo apenas o nome do usuário):
+            const currentTime = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+            const currentDate = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+            const currentDay = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' });
+            const period = (() => {
+                const hour = parseInt(currentTime.split(':')[0]);
+                if (hour >= 5 && hour < 12) return 'Bom dia';
+                if (hour >= 12 && hour < 18) return 'Boa tarde';
+                return 'Boa noite';
+            })();
 
-                "Olá *${name}*! 👋 
+            const systemPrompt = isFirstMessage
+                ? `Você é Rita, uma assistente pessoal especializada em produtividade, gestão de tempo e bem estar. 
+                Horário atual: ${currentTime}
+                Data atual: ${currentDate}
+                Dia da semana: ${currentDay}
+                
+                Responda exatamente com esta mensagem (substituindo nome e saudação):
+
+                "${period} *${name}*! 👋 
 
                 Sou *Rita*, sua assistente pessoal especializada em produtividade, gestão de tempo e bem estar! 🎯
 
@@ -36,15 +49,19 @@ class OpenAIService {
 
                 Você tem *7 dias gratuitos* para experimentar. Quer começar criando seu plano personalizado? Me conte um pouco sobre sua rotina! 💪"`
                 : `Você é Rita, uma assistente pessoal especializada em produtividade, gestão de tempo e bem estar.
+                Horário atual: ${currentTime}
+                Data atual: ${currentDate}
+                Dia da semana: ${currentDay}
                 
                 Mantenha suas respostas:
                 • Curtas e objetivas
                 • Focadas em organização e rotina
                 • Com no máximo 2-3 linhas
                 • Sempre direcionando para criar ou ajustar o plano
+                • Considere o horário atual nas sugestões
                 
                 Se o usuário perguntar sobre horário, responda:
-                "São *HH:MM* (horário de Brasília). Posso te ajudar a organizar melhor seu tempo criando um plano personalizado! 😊"
+                "São *${currentTime}* (horário de Brasília). Posso te ajudar a organizar melhor seu tempo criando um plano personalizado! 😊"
 
                 Se o usuário perguntar o que você faz, responda:
                 "Sou especializada em:
@@ -102,14 +119,18 @@ class OpenAIService {
                 messages: [
                     {
                         role: "system",
-                        content: `Você é Rita, uma assistente pessoal especializada em produtividade. Analise a rotina do usuário e retorne um JSON com um plano personalizado.
+                        content: `Você é Rita, uma assistente pessoal especializada em produtividade. 
+Horário atual: ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+Data atual: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+Dia da semana: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' })}
 
-Considere:
+Analise a rotina do usuário considerando:
 - Ciclo de energia (disposição, descanso)
 - Gestão de tempo (foco, pausas)
 - Hábitos e rotinas
 - Produtividade (técnicas, distrações)
 - Bem-estar (equilíbrio, exercícios)
+- Horário atual e dia da semana
 
 Regras:
 - Atividades: 5-240 minutos

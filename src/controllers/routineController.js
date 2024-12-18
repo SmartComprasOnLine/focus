@@ -102,101 +102,66 @@ class RoutineController {
         return;
       }
 
-      // Analyze the update request
-      const updateInfo = await intentService.analyzePlanUpdate(message, routine);
-      console.log('Update info:', updateInfo);
+      // Format current plan for OpenAI
+      const currentPlan = {
+        atividades: routine.activities.map(a => ({
+          horário: a.scheduledTime,
+          tarefa: a.activity,
+          duração: a.duration,
+          categoria: a.type,
+          energia: 'média',
+          sugestões: [],
+          lembretes: a.messages || {}
+        }))
+      };
 
-      // Update the routine based on the analysis
-      if (updateInfo.type === 'modify') {
-        const updatedActivities = [];
-        
-        for (const activityUpdate of updateInfo.activities) {
-          const activity = routine.activities.find(a => {
-            // Try to match by activity name containing the target activity
-            const activityNameMatch = a.activity.toLowerCase().includes(activityUpdate.task.toLowerCase());
-            // Or by time if specified
-            const timeMatch = activityUpdate.time && a.scheduledTime === activityUpdate.time;
-            return activityNameMatch || timeMatch;
-          });
+      // Generate new plan based on current plan and requested changes
+      const newPlan = await openaiService.generateInitialPlan(user.name, message, [
+        { role: 'system', content: JSON.stringify(currentPlan) }
+      ]);
 
-          if (activity) {
-            console.log('Updating activity:', {
-              from: {
-                activity: activity.activity,
-                scheduledTime: activity.scheduledTime,
-                duration: activity.duration
-              },
-              changes: activityUpdate.changes
-            });
+      // Convert new plan activities to routine format
+      const activities = newPlan.atividades.map(activity => ({
+        activity: activity.tarefa,
+        scheduledTime: activity.horário,
+        type: 'routine',
+        status: 'active',
+        duration: activity.duração,
+        messages: activity.lembretes
+      }));
 
-            const originalTime = activity.scheduledTime;
-
-            if (activityUpdate.changes.field === 'time') {
-              try {
-                // Validate and set new time
-                activity.scheduledTime = this.validateTime(activityUpdate.changes.to);
-                
-                // Calculate time change and adjust subsequent activities
-                const timeChange = this.calculateTimeChange(originalTime, activity.scheduledTime);
-                this.adjustSubsequentActivities(routine, activity, timeChange);
-                
-                updatedActivities.push({
-                  task: activity.activity,
-                  change: `horário atualizado para *${activity.scheduledTime}*`
-                });
-              } catch (error) {
-                console.error('Invalid time update:', error);
-                continue;
-              }
-            } else if (activityUpdate.changes.field === 'duration') {
-              const newDuration = parseInt(activityUpdate.changes.to);
-              
-              if (isNaN(newDuration) || newDuration < 5) {
-                console.error('Invalid duration:', activityUpdate.changes.to);
-                continue;
-              }
-
-              if (newDuration > 240) {
-                // For long activities, adjust duration and add buffer
-                activity.duration = Math.min(newDuration, 240);
-                this.adjustSubsequentActivities(routine, activity, 0);
-              } else {
-                activity.duration = newDuration;
-                this.adjustSubsequentActivities(routine, activity, 0);
-              }
-
-              updatedActivities.push({
-                task: activity.activity,
-                change: `duração atualizada para *${activity.duration} minutos*`
-              });
-            }
-          }
-        }
-
-        // Sort activities by time after all updates
-        routine.activities.sort((a, b) => this.timeToMinutes(a.scheduledTime) - this.timeToMinutes(b.scheduledTime));
-
-        // Format confirmation message with actual changes made
-        const confirmMessage = `*Plano atualizado com sucesso!* ✅\n\n` +
-          `*Alterações realizadas:*\n` +
-          updatedActivities.map(update => `• ${update.task}: ${update.change}`).join('\n') +
-          `\n\n*Seu plano atualizado:*\n` +
-          routine.activities.map(a => {
-            const isUpdated = updatedActivities.some(update => 
-              a.activity.toLowerCase().includes(update.task.toLowerCase())
-            );
-            return `${isUpdated ? '🔄' : '⏰'} *${a.scheduledTime}* - _${a.activity}_ (${a.duration}min)${isUpdated ? ' ✨' : ''}`;
-          }).join('\n') +
-          `\n\n_Lembretes atualizados nos novos horários!_ ⏰`;
-
-        await user.addToMessageHistory('assistant', confirmMessage);
-        await evolutionApi.sendText(user.whatsappNumber, confirmMessage);
-      }
-
+      // Update routine with new activities
+      routine.activities = activities;
       await routine.save();
 
-      // Update reminders for the modified routine
+      // Update reminders
       await reminderService.setupReminders(user, routine);
+
+      // Format activities for WhatsApp
+      const formattedActivities = newPlan.atividades.map(a => {
+        const energyEmoji = {
+          'alta': '⚡',
+          'média': '💫',
+          'baixa': '🌙'
+        }[a.energia] || '⏰';
+        
+        return `${energyEmoji} *${a.horário}* - _${a.tarefa}_ (${a.duração}min)`;
+      }).join('\n');
+
+      // Format analysis
+      const formattedAnalysis = 
+        '\n\n*📊 Análise das mudanças:*\n' +
+        '\n*Ajustes realizados:*\n' + newPlan.análise.pontos_fortes.map(p => `• ${p}`).join('\n') +
+        '\n\n*💡 Recomendações:*\n' + newPlan.análise.oportunidades.map(o => `• ${o}`).join('\n');
+
+      // Send confirmation message
+      const confirmMessage = `*Plano atualizado com sucesso!* ✅\n\n` +
+        formattedActivities +
+        formattedAnalysis +
+        '\n\n_Lembretes atualizados nos novos horários!_ ⏰';
+
+      await user.addToMessageHistory('assistant', confirmMessage);
+      await evolutionApi.sendText(user.whatsappNumber, confirmMessage);
 
     } catch (error) {
       console.error('Error updating plan:', error);

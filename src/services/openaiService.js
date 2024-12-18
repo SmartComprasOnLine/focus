@@ -124,7 +124,22 @@ Horário atual: ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sa
 Data atual: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
 Dia da semana: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' })}
 
-Analise a rotina do usuário considerando:
+${messageHistory.length > 0 ? 
+`Atualize o plano existente mantendo a mesma estrutura e fazendo apenas as alterações solicitadas.
+
+Plano atual:
+${messageHistory[0].content}
+
+Mudanças solicitadas:
+${message}
+
+Importante:
+1. Mantenha as atividades que não foram mencionadas nas mudanças
+2. Atualize apenas os horários e durações solicitados
+3. Ajuste os horários subsequentes conforme necessário
+4. Mantenha a mesma estrutura e formato do plano` 
+:
+`Analise a rotina do usuário considerando:`}
 - Ciclo de energia (disposição, descanso)
 - Gestão de tempo (foco, pausas)
 - Hábitos e rotinas

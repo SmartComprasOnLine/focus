@@ -158,13 +158,28 @@ class RoutineController {
       // Update reminders for the modified routine
       await reminderService.setupReminders(user, routine);
 
-      // Format activities for WhatsApp
-      const formattedActivities = routine.activities.map(a => 
-        `⏰ *${a.scheduledTime}* - _${a.activity}_ (${a.duration}min)`
-      ).join('\n');
+      // Format activities for WhatsApp with highlighting for updated ones
+      const formattedActivities = routine.activities.map(a => {
+        const isUpdated = updateInfo.activities.some(update => 
+          a.activity.toLowerCase().includes(update.task.toLowerCase()) ||
+          a.scheduledTime === update.time
+        );
+        return `${isUpdated ? '🔄' : '⏰'} *${a.scheduledTime}* - _${a.activity}_ (${a.duration}min)${isUpdated ? ' ✨' : ''}`;
+      }).join('\n');
 
-      // Send confirmation message with full plan
-      const confirmMessage = `*Plano atualizado com sucesso!* ✅\n\n${formattedActivities}\n\nConfigurei lembretes para ajudar você a seguir o plano. Você receberá notificações nos horários programados. ⏰\n\nVamos começar? Responda "sim" para confirmar ou me diga se precisar de ajustes. 😊`;
+      // Create a focused confirmation message highlighting the changes
+      const confirmMessage = `*Plano atualizado com sucesso!* ✅\n\n` +
+        `*Alterações realizadas:*\n` +
+        updateInfo.activities.map(update => 
+          `• ${update.changes.field === 'time' ? 
+            `Horário de "${update.task}" alterado para *${update.changes.to}*` :
+            `Duração de "${update.task}" alterada para *${update.changes.to}min*`}`
+        ).join('\n') +
+        `\n\n*Seu plano atualizado:*\n${formattedActivities}\n\n` +
+        `_Lembretes atualizados nos novos horários!_ ⏰`;
+      
+      // Add confirmation message to user history
+      await user.addToMessageHistory('assistant', confirmMessage);
       
       await evolutionApi.sendText(user.whatsappNumber, confirmMessage);
 

@@ -114,7 +114,40 @@ class RoutineController {
               const timeChange = this.calculateTimeChange(activity.scheduledTime, activityUpdate.changes.to);
               this.adjustSubsequentActivities(routine, activity, timeChange);
             } else if (activityUpdate.changes.field === 'duration') {
-              activity.duration = parseInt(activityUpdate.changes.to);
+              const newDuration = parseInt(activityUpdate.changes.to);
+              
+              if (newDuration > 240) {
+                // Split into multiple parts
+                const parts = Math.ceil(newDuration / 240);
+                const baseDuration = Math.floor(newDuration / parts);
+                const [baseHours, baseMinutes] = activity.scheduledTime.split(':').map(Number);
+                
+                // Update the first part
+                activity.duration = baseDuration;
+                
+                // Create additional parts
+                for (let i = 1; i < parts; i++) {
+                  const nextTime = new Date(2024, 0, 1, baseHours, baseMinutes + (baseDuration + 15) * i);
+                  const nextTimeStr = nextTime.toTimeString().slice(0, 5);
+                  
+                  routine.activities.push({
+                    activity: `${activity.activity} (Parte ${i + 1})`,
+                    scheduledTime: nextTimeStr,
+                    duration: baseDuration,
+                    type: activity.type,
+                    status: 'active'
+                  });
+                }
+                
+                // Sort activities by time
+                routine.activities.sort((a, b) => {
+                  const [aHours, aMinutes] = a.scheduledTime.split(':').map(Number);
+                  const [bHours, bMinutes] = b.scheduledTime.split(':').map(Number);
+                  return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
+                });
+              } else {
+                activity.duration = newDuration;
+              }
             }
           }
         });

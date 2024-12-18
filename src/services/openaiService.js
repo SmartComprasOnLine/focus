@@ -213,14 +213,17 @@ Retorne apenas um JSON válido neste formato:
                 }
 
                 // Handle long activities by adding breaks
-                if (activity.duração > 240 && activity.categoria !== 'descanso') {
+                if (activity.duração > 120 && activity.categoria !== 'descanso') {
                     const segments = [];
                     let remainingDuration = activity.duração;
                     let currentTime = activity.horário;
                     let partCount = 1;
 
                     while (remainingDuration > 0) {
-                        const segmentDuration = Math.min(remainingDuration, 120); // Max 2 hours per segment
+                        // For work activities, add breaks every 2 hours
+                        const segmentDuration = activity.categoria === 'trabalho' ? 
+                            Math.min(remainingDuration, 120) : // 2 hours for work
+                            remainingDuration; // Full duration for other activities
                         segments.push({
                             horário: currentTime,
                             tarefa: segments.length === 0 ? activity.tarefa : `${activity.tarefa} (continuação)`,

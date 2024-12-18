@@ -38,7 +38,6 @@ const routineSchema = new mongoose.Schema({
     duration: {
       type: Number,
       min: 5,
-      max: 240,
       required: true
     },
     messages: {

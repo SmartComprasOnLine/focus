@@ -49,18 +49,37 @@ class RoutineController {
       // Setup reminders
       await reminderService.setupReminders(user, routine);
 
-      // Format activities for WhatsApp
-      const formattedActivities = plan.atividades.map(a => 
-        `⏰ *${a.horário}* - _${a.tarefa}_ (${a.duração}min)`
-      ).join('\n');
+      // Format activities and analysis for WhatsApp
+      const formattedActivities = plan.atividades.map(a => {
+        const energyEmoji = {
+          'alta': '⚡',
+          'média': '💫',
+          'baixa': '🌙'
+        }[a.energia] || '⏰';
+        
+        return `${energyEmoji} *${a.horário}* - _${a.tarefa}_ (${a.duração}min)`;
+      }).join('\n');
 
-      // Send plan to user with WhatsApp formatting
+      // Format suggestions and insights
+      const formattedAnalysis = 
+        '\n\n*📊 Análise da sua rotina:*\n' +
+        '\n*Pontos fortes:*\n' + plan.análise.pontos_fortes.map(p => `• ${p}`).join('\n') +
+        '\n\n*💡 Oportunidades de melhoria:*\n' + plan.análise.oportunidades.map(o => `• ${o}`).join('\n');
+
+      // Format follow-up questions
+      const formattedQuestions = 
+        '\n\n*🤔 Para otimizar ainda mais seu plano, me conte:*\n' +
+        plan.análise.perguntas.map(q => `• ${q}`).join('\n');
+
+      // Send complete analysis to user
       await evolutionApi.sendText(
         user.whatsappNumber,
-        `*Ótimo! Criei um plano personalizado para você:* 🎯\n\n` +
+        `*Ótimo! Analisei sua rotina e criei um plano personalizado:* 🎯\n\n` +
         formattedActivities +
-        '\n\n_Configurei lembretes para ajudar você a seguir o plano. Você receberá notificações nos horários programados._ ⏰\n\n' +
-        '*Vamos começar?* Responda "sim" para confirmar ou me diga se precisar de ajustes. 😊'
+        formattedAnalysis +
+        formattedQuestions +
+        '\n\n_Configurei lembretes inteligentes para cada atividade, com dicas de produtividade e foco._ ⏰\n\n' +
+        '*Vamos começar?* Responda "sim" para confirmar o plano, ou me conte o que gostaria de ajustar. 😊'
       );
 
       return routine;

@@ -128,23 +128,36 @@ class OpenAIService {
                         }
 
                         Regras importantes:
-                        1. A duração de cada atividade deve estar entre *5 e 240 minutos*.
-                        2. Divida atividades longas (>4 horas) em partes menores.
-                        3. Inclua pausas estratégicas entre atividades:
-                           - Pausa de 5-15 minutos a cada 90-120 minutos de trabalho
-                           - Soneca após almoço limitada a 30 minutos
-                           - Intervalos para hidratação a cada 2-3 horas
-                        4. Use lembretes motivacionais com emojis ✨.
-                        5. Foque na produtividade, com um ritmo equilibrado e otimizado.
-                        6. Distribua o trabalho em blocos flexíveis ao longo do dia.
-                        7. Respeite horários importantes:
-                           - Início do dia: 8:00
-                           - Almoço: 12:00-13:00
-                           - Fim do dia: 22:00
-                        8. Distribua a hidratação ao longo do dia:
-                           - Água: 1,5L dividido em 4-6 porções
-                           - Tereré: 1,5L dividido em 3-4 porções
-                        9. Priorize um sono noturno adequado (7-8 horas)`
+                        1. Horários e durações:
+                           - Atividades entre 5-240 minutos
+                           - Não divida atividades em partes
+                           - Respeite horários fixos do usuário
+                           - Evite sobreposições de horários
+                           
+                        2. Pausas e descanso:
+                           - 5-15 min a cada 90-120 min de trabalho
+                           - Soneca pós-almoço máx. 30-40 min
+                           - Intervalos para hidratação a cada 2-3h
+                           
+                        3. Hidratação distribuída:
+                           - Água: 1,5L em 4-6 porções
+                           - Tereré: 1,5L em 3-4 porções
+                           - Intercale água e tereré
+                           
+                        4. Estrutura do dia:
+                           - Manhã: atividades físicas/importantes
+                           - Tarde: trabalho com pausas regulares
+                           - Noite: atividades leves, preparação sono
+                           
+                        5. Sono e descanso:
+                           - Horário dormir: 22:00-22:30
+                           - Duração: 7-8 horas contínuas
+                           - Preparação: 30-45 min antes
+                           
+                        6. Lembretes:
+                           - Motivacionais e específicos
+                           - Use emojis relevantes
+                           - Foque em produtividade e bem-estar`
                     },
                     ...messageHistory,
                     {
@@ -227,38 +240,30 @@ class OpenAIService {
                         
                         Resuma o plano diário exatamente neste formato:
 
-*🌅 Manhã*
-• *HH:MM* _Descrição da atividade_
-• *HH:MM* _Descrição da atividade_
+*🌅 Manhã (até 12:00)*
 • *HH:MM* _Descrição da atividade_
 
-_Mensagem motivacional personalizada!_ ✨
-
-*🌞 Tarde*
-• *HH:MM* _Descrição da atividade_
-• *HH:MM* _Descrição da atividade_
+*🌞 Tarde (12:00-18:00)*
 • *HH:MM* _Descrição da atividade_
 
-_Mensagem motivacional personalizada!_ 💪
-
-*🌙 Noite*
-• *HH:MM* _Descrição da atividade_
-• *HH:MM* _Descrição da atividade_
+*🌙 Noite (após 18:00)*
 • *HH:MM* _Descrição da atividade_
 
-_Mensagem motivacional personalizada!_ 🌟
+_Mensagem motivacional curta e relevante_ ✨
 
 Regras importantes:
-1. Use exatamente esta formatação:
-   - Títulos em *negrito* com emoji
-   - Horários em *negrito*
-   - Atividades em _itálico_
-   - Bullet points com •
-   - Uma linha em branco antes das mensagens motivacionais
-   - Mensagens motivacionais em _itálico_ com emoji
-2. Agrupe por períodos do dia (máx. 3 atividades por período)
-3. Personalize as mensagens motivacionais ao contexto
-4. Mantenha a formatação consistente`
+1. Use formatação consistente:
+   - Títulos: *emoji Período (horário)*
+   - Atividades: • *HH:MM* _Descrição_
+   - Mensagem final: _texto_ ✨
+2. Agrupe atividades por período do dia
+3. Não divida períodos em subseções
+4. Não divida o sono em partes
+5. Remova espaços extras após descrições
+6. Use apenas uma mensagem motivacional ao final
+7. Não inclua períodos sem atividades
+8. Mantenha horários realistas e sem sobreposições
+9. Respeite os horários fixos do usuário (trabalho, compromissos)`
                     },
                     ...messageHistory,
                     {

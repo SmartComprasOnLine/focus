@@ -12,17 +12,20 @@ class IntentService {
         try {
             // Check for direct commands first
             const lowerMessage = message.toLowerCase().trim();
-            if (lowerMessage === 'apagar meus dados' || 
-                lowerMessage === 'deletar meus dados' || 
-                lowerMessage === 'excluir meus dados' ||
-                lowerMessage === 'remover meus dados') {
+            
+            // Data deletion commands
+            const deleteCommands = [
+                'apagar', 'deletar', 'excluir', 'remover',
+                'apagar dados', 'deletar dados', 'excluir dados', 'remover dados',
+                'apagar meus dados', 'deletar meus dados', 'excluir meus dados', 'remover meus dados'
+            ];
+            if (deleteCommands.some(cmd => lowerMessage.includes(cmd))) {
                 return 'delete_data';
             }
 
-            if (lowerMessage === 'sim' || 
-                lowerMessage === 'ótimo' || 
-                lowerMessage === 'ok' ||
-                lowerMessage === 'beleza') {
+            // Confirmation commands
+            const confirmCommands = ['sim', 'ótimo', 'ok', 'beleza', 'confirmar', 'pode ser', 'claro'];
+            if (confirmCommands.some(cmd => lowerMessage === cmd)) {
                 return 'confirm_plan';
             }
 

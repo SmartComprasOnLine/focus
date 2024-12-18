@@ -217,8 +217,8 @@ class RoutineController {
 
     // Calculate total duration including buffer
     const calculateEndTime = (activity) => {
-      const [hours, minutes] = activity.scheduledTime.split(':').map(Number);
-      return hours * 60 + minutes + activity.duration + 15; // 15min buffer
+      const totalMinutes = this.timeToMinutes(activity.scheduledTime) + activity.duration + 15; // 15min buffer
+      return totalMinutes;
     };
 
     // Adjust subsequent activities
@@ -228,12 +228,14 @@ class RoutineController {
       
       // Calculate new start time based on previous activity's end
       const prevEndTime = calculateEndTime(prevActivity);
-      const newHours = Math.floor(prevEndTime / 60);
-      const newMinutes = prevEndTime % 60;
       
       // Update time if it would overlap
       const currentStartTime = this.timeToMinutes(currentActivity.scheduledTime);
       if (currentStartTime < prevEndTime) {
+        // Keep time within 24 hours
+        const adjustedTime = prevEndTime % (24 * 60);
+        const newHours = Math.floor(adjustedTime / 60);
+        const newMinutes = adjustedTime % 60;
         currentActivity.scheduledTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
       }
     }

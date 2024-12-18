@@ -201,37 +201,79 @@ Retorne apenas um JSON válido neste formato:
 
             const plan = JSON.parse(response.choices[0].message.content);
 
+            // Process activities and handle special cases
             plan.atividades = plan.atividades.map(activity => {
+                // Ensure minimum duration
                 activity.duração = Math.max(5, activity.duração || 30);
 
-                if (activity.duração > 240) {
+                // Special handling for sleep activity
+                if (activity.categoria === 'descanso' && activity.tarefa.toLowerCase().includes('dormir')) {
+                    // Keep sleep as one activity with full duration
+                    return activity;
+                }
+
+                // Handle long activities by adding breaks
+                if (activity.duração > 240 && activity.categoria !== 'descanso') {
                     const segments = [];
                     let remainingDuration = activity.duração;
                     let currentTime = activity.horário;
+                    let partCount = 1;
 
                     while (remainingDuration > 0) {
-                        const segmentDuration = Math.min(remainingDuration, 240);
+                        const segmentDuration = Math.min(remainingDuration, 120); // Max 2 hours per segment
                         segments.push({
                             horário: currentTime,
-                            tarefa: `${activity.tarefa} (Parte ${segments.length + 1})`,
+                            tarefa: segments.length === 0 ? activity.tarefa : `${activity.tarefa} (continuação)`,
                             duração: segmentDuration,
+                            categoria: activity.categoria,
+                            energia: activity.energia,
+                            sugestões: activity.sugestões,
                             lembretes: {
-                                antes: `⏰ Prepare-se para continuar _${activity.tarefa}_!`,
-                                início: `🚀 Vamos focar em _${activity.tarefa}_!`,
+                                antes: `⏰ ${partCount === 1 ? 'Prepare-se para' : 'Continue com'} _${activity.tarefa}_!`,
+                                início: `🚀 ${partCount === 1 ? 'Vamos começar' : 'Vamos continuar'} _${activity.tarefa}_!`,
                                 durante: [`💡 Mantenha o foco em _${activity.tarefa}_.`],
-                                final: remainingDuration <= 240
+                                final: remainingDuration <= 120
                                     ? `✅ Você concluiu _${activity.tarefa}_!`
                                     : `⏸️ Hora de uma pausa de _${activity.tarefa}_!`,
-                                acompanhamento: remainingDuration <= 240
+                                acompanhamento: remainingDuration <= 120
                                     ? `🎉 Excelente trabalho em _${activity.tarefa}_!`
-                                    : `🔋 Recarregue as energias para continuar!`
+                                    : `🔋 Faça uma pausa e recarregue as energias!`
                             }
                         });
 
+                        // Add a break between segments if not the last segment
+                        if (remainingDuration > 120) {
+                            const [hours, minutes] = currentTime.split(':').map(Number);
+                            const breakStartMinutes = hours * 60 + minutes + segmentDuration;
+                            const breakStartHours = Math.floor(breakStartMinutes / 60) % 24;
+                            const breakStartMins = breakStartMinutes % 60;
+                            const breakTime = `${String(breakStartHours).padStart(2, '0')}:${String(breakStartMins).padStart(2, '0')}`;
+
+                            segments.push({
+                                horário: breakTime,
+                                tarefa: 'Pausa para descanso',
+                                duração: 15,
+                                categoria: 'descanso',
+                                energia: 'baixa',
+                                sugestões: ['Faça uma pausa ativa', 'Hidrate-se', 'Faça alongamentos'],
+                                lembretes: {
+                                    antes: '⏸️ Hora de fazer uma pausa!',
+                                    início: '🌿 Aproveite para relaxar um pouco.',
+                                    durante: ['💆 Momento de recarregar as energias.'],
+                                    final: '✨ Pausa concluída!',
+                                    acompanhamento: '💪 Pronto para continuar?'
+                                }
+                            });
+
+                            // Update current time for next segment
+                            const nextSegmentMinutes = breakStartMinutes + 15;
+                            const nextHours = Math.floor(nextSegmentMinutes / 60) % 24;
+                            const nextMins = nextSegmentMinutes % 60;
+                            currentTime = `${String(nextHours).padStart(2, '0')}:${String(nextMins).padStart(2, '0')}`;
+                        }
+
                         remainingDuration -= segmentDuration;
-                        const [hours, minutes] = currentTime.split(':').map(Number);
-                        const nextTime = new Date(2024, 0, 1, hours, minutes + segmentDuration + 15);
-                        currentTime = nextTime.toTimeString().slice(0, 5);
+                        partCount++;
                     }
                     return segments;
                 }
@@ -239,7 +281,12 @@ Retorne apenas um JSON válido neste formato:
                 return activity;
             });
 
-            plan.atividades = plan.atividades.flat();
+            // Flatten the array and sort by time
+            plan.atividades = plan.atividades.flat().sort((a, b) => {
+                const timeA = a.horário.split(':').map(Number);
+                const timeB = b.horário.split(':').map(Number);
+                return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1]);
+            });
 
             console.log('Plano gerado:', {
                 status: 'sucesso',

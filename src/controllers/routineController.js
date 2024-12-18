@@ -90,14 +90,29 @@ class RoutineController {
       // Update the routine based on the analysis
       if (updateInfo.type === 'modify') {
         updateInfo.activities.forEach(activityUpdate => {
-          const activity = routine.activities.find(a => 
-            a.activity === activityUpdate.id || 
-            (a.scheduledTime === activityUpdate.time && a.activity === activityUpdate.task)
-          );
+          const activity = routine.activities.find(a => {
+            // Try to match by activity name containing the target activity
+            const activityNameMatch = a.activity.toLowerCase().includes(activityUpdate.task.toLowerCase());
+            // Or by time if specified
+            const timeMatch = activityUpdate.time && a.scheduledTime === activityUpdate.time;
+            return activityNameMatch || timeMatch;
+          });
 
           if (activity) {
+            console.log('Updating activity:', {
+              from: {
+                activity: activity.activity,
+                scheduledTime: activity.scheduledTime,
+                duration: activity.duration
+              },
+              changes: activityUpdate.changes
+            });
+
             if (activityUpdate.changes.field === 'time') {
               activity.scheduledTime = activityUpdate.changes.to;
+              // Adjust subsequent activities if needed
+              const timeChange = this.calculateTimeChange(activity.scheduledTime, activityUpdate.changes.to);
+              this.adjustSubsequentActivities(routine, activity, timeChange);
             } else if (activityUpdate.changes.field === 'duration') {
               activity.duration = parseInt(activityUpdate.changes.to);
             }
@@ -106,6 +121,9 @@ class RoutineController {
       }
 
       await routine.save();
+
+      // Update reminders for the modified routine
+      await reminderService.setupReminders(user, routine);
 
       // Send confirmation message
       const confirmMessage = `*Plano atualizado com sucesso!* ✅\n\nVou te mostrar como ficou:`;
@@ -118,6 +136,28 @@ class RoutineController {
       console.error('Error updating plan:', error);
       throw error;
     }
+  }
+
+  calculateTimeChange(oldTime, newTime) {
+    const [oldHours, oldMinutes] = oldTime.split(':').map(Number);
+    const [newHours, newMinutes] = newTime.split(':').map(Number);
+    return (newHours * 60 + newMinutes) - (oldHours * 60 + oldMinutes);
+  }
+
+  adjustSubsequentActivities(routine, changedActivity, timeChange) {
+    let adjustNeeded = false;
+    routine.activities.forEach(activity => {
+      if (adjustNeeded) {
+        const [hours, minutes] = activity.scheduledTime.split(':').map(Number);
+        const totalMinutes = hours * 60 + minutes + timeChange;
+        const newHours = Math.floor(totalMinutes / 60);
+        const newMinutes = totalMinutes % 60;
+        activity.scheduledTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+      }
+      if (activity === changedActivity) {
+        adjustNeeded = true;
+      }
+    });
   }
 
   async updatePlanProgress(user, completedTasks, feedback) {

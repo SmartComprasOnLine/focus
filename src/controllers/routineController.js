@@ -89,7 +89,9 @@ class RoutineController {
 
       // Update the routine based on the analysis
       if (updateInfo.type === 'modify') {
-        updateInfo.activities.forEach(activityUpdate => {
+        const updatedActivities = [];
+        
+        for (const activityUpdate of updateInfo.activities) {
           const activity = routine.activities.find(a => {
             // Try to match by activity name containing the target activity
             const activityNameMatch = a.activity.toLowerCase().includes(activityUpdate.task.toLowerCase());
@@ -108,80 +110,74 @@ class RoutineController {
               changes: activityUpdate.changes
             });
 
+            const originalTime = activity.scheduledTime;
+
             if (activityUpdate.changes.field === 'time') {
-              activity.scheduledTime = activityUpdate.changes.to;
-              // Adjust subsequent activities if needed
-              const timeChange = this.calculateTimeChange(activity.scheduledTime, activityUpdate.changes.to);
-              this.adjustSubsequentActivities(routine, activity, timeChange);
+              try {
+                // Validate and set new time
+                activity.scheduledTime = this.validateTime(activityUpdate.changes.to);
+                
+                // Calculate time change and adjust subsequent activities
+                const timeChange = this.calculateTimeChange(originalTime, activity.scheduledTime);
+                this.adjustSubsequentActivities(routine, activity, timeChange);
+                
+                updatedActivities.push({
+                  task: activity.activity,
+                  change: `horário atualizado para *${activity.scheduledTime}*`
+                });
+              } catch (error) {
+                console.error('Invalid time update:', error);
+                continue;
+              }
             } else if (activityUpdate.changes.field === 'duration') {
               const newDuration = parseInt(activityUpdate.changes.to);
               
+              if (isNaN(newDuration) || newDuration < 5) {
+                console.error('Invalid duration:', activityUpdate.changes.to);
+                continue;
+              }
+
               if (newDuration > 240) {
-                // Split into multiple parts
-                const parts = Math.ceil(newDuration / 240);
-                const baseDuration = Math.floor(newDuration / parts);
-                const [baseHours, baseMinutes] = activity.scheduledTime.split(':').map(Number);
-                
-                // Update the first part
-                activity.duration = baseDuration;
-                
-                // Create additional parts
-                for (let i = 1; i < parts; i++) {
-                  const nextTime = new Date(2024, 0, 1, baseHours, baseMinutes + (baseDuration + 15) * i);
-                  const nextTimeStr = nextTime.toTimeString().slice(0, 5);
-                  
-                  routine.activities.push({
-                    activity: `${activity.activity} (Parte ${i + 1})`,
-                    scheduledTime: nextTimeStr,
-                    duration: baseDuration,
-                    type: activity.type,
-                    status: 'active'
-                  });
-                }
-                
-                // Sort activities by time
-                routine.activities.sort((a, b) => {
-                  const [aHours, aMinutes] = a.scheduledTime.split(':').map(Number);
-                  const [bHours, bMinutes] = b.scheduledTime.split(':').map(Number);
-                  return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
-                });
+                // For long activities, adjust duration and add buffer
+                activity.duration = Math.min(newDuration, 240);
+                this.adjustSubsequentActivities(routine, activity, 0);
               } else {
                 activity.duration = newDuration;
+                this.adjustSubsequentActivities(routine, activity, 0);
               }
+
+              updatedActivities.push({
+                task: activity.activity,
+                change: `duração atualizada para *${activity.duration} minutos*`
+              });
             }
           }
-        });
+        }
+
+        // Sort activities by time after all updates
+        routine.activities.sort((a, b) => this.timeToMinutes(a.scheduledTime) - this.timeToMinutes(b.scheduledTime));
+
+        // Format confirmation message with actual changes made
+        const confirmMessage = `*Plano atualizado com sucesso!* ✅\n\n` +
+          `*Alterações realizadas:*\n` +
+          updatedActivities.map(update => `• ${update.task}: ${update.change}`).join('\n') +
+          `\n\n*Seu plano atualizado:*\n` +
+          routine.activities.map(a => {
+            const isUpdated = updatedActivities.some(update => 
+              a.activity.toLowerCase().includes(update.task.toLowerCase())
+            );
+            return `${isUpdated ? '🔄' : '⏰'} *${a.scheduledTime}* - _${a.activity}_ (${a.duration}min)${isUpdated ? ' ✨' : ''}`;
+          }).join('\n') +
+          `\n\n_Lembretes atualizados nos novos horários!_ ⏰`;
+
+        await user.addToMessageHistory('assistant', confirmMessage);
+        await evolutionApi.sendText(user.whatsappNumber, confirmMessage);
       }
 
       await routine.save();
 
       // Update reminders for the modified routine
       await reminderService.setupReminders(user, routine);
-
-      // Format activities for WhatsApp with highlighting for updated ones
-      const formattedActivities = routine.activities.map(a => {
-        const isUpdated = updateInfo.activities.some(update => 
-          a.activity.toLowerCase().includes(update.task.toLowerCase()) ||
-          a.scheduledTime === update.time
-        );
-        return `${isUpdated ? '🔄' : '⏰'} *${a.scheduledTime}* - _${a.activity}_ (${a.duration}min)${isUpdated ? ' ✨' : ''}`;
-      }).join('\n');
-
-      // Create a focused confirmation message highlighting the changes
-      const confirmMessage = `*Plano atualizado com sucesso!* ✅\n\n` +
-        `*Alterações realizadas:*\n` +
-        updateInfo.activities.map(update => 
-          `• ${update.changes.field === 'time' ? 
-            `Horário de "${update.task}" alterado para *${update.changes.to}*` :
-            `Duração de "${update.task}" alterada para *${update.changes.to}min*`}`
-        ).join('\n') +
-        `\n\n*Seu plano atualizado:*\n${formattedActivities}\n\n` +
-        `_Lembretes atualizados nos novos horários!_ ⏰`;
-      
-      // Add confirmation message to user history
-      await user.addToMessageHistory('assistant', confirmMessage);
-      
-      await evolutionApi.sendText(user.whatsappNumber, confirmMessage);
 
     } catch (error) {
       console.error('Error updating plan:', error);
@@ -196,19 +192,51 @@ class RoutineController {
   }
 
   adjustSubsequentActivities(routine, changedActivity, timeChange) {
-    let adjustNeeded = false;
-    routine.activities.forEach(activity => {
-      if (adjustNeeded) {
-        const [hours, minutes] = activity.scheduledTime.split(':').map(Number);
-        const totalMinutes = hours * 60 + minutes + timeChange;
-        const newHours = Math.floor(totalMinutes / 60);
-        const newMinutes = totalMinutes % 60;
-        activity.scheduledTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+    // Find the index of the changed activity
+    const changedIndex = routine.activities.findIndex(a => a === changedActivity);
+    if (changedIndex === -1) return;
+
+    // Calculate total duration including buffer
+    const calculateEndTime = (activity) => {
+      const [hours, minutes] = activity.scheduledTime.split(':').map(Number);
+      return hours * 60 + minutes + activity.duration + 15; // 15min buffer
+    };
+
+    // Adjust subsequent activities
+    for (let i = changedIndex + 1; i < routine.activities.length; i++) {
+      const prevActivity = routine.activities[i - 1];
+      const currentActivity = routine.activities[i];
+      
+      // Calculate new start time based on previous activity's end
+      const prevEndTime = calculateEndTime(prevActivity);
+      const newHours = Math.floor(prevEndTime / 60);
+      const newMinutes = prevEndTime % 60;
+      
+      // Update time if it would overlap
+      const currentStartTime = this.timeToMinutes(currentActivity.scheduledTime);
+      if (currentStartTime < prevEndTime) {
+        currentActivity.scheduledTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
       }
-      if (activity === changedActivity) {
-        adjustNeeded = true;
-      }
-    });
+    }
+  }
+
+  timeToMinutes(time) {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
+  minutesToTime(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  }
+
+  validateTime(time) {
+    const minutes = this.timeToMinutes(time);
+    if (minutes < 0 || minutes >= 24 * 60) {
+      throw new Error(`Invalid time: ${time}`);
+    }
+    return time;
   }
 
   async updatePlanProgress(user, completedTasks, feedback) {

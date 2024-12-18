@@ -130,9 +130,21 @@ class OpenAIService {
                         Regras importantes:
                         1. A duração de cada atividade deve estar entre *5 e 240 minutos*.
                         2. Divida atividades longas (>4 horas) em partes menores.
-                        3. Inclua pausas estratégicas entre atividades.
+                        3. Inclua pausas estratégicas entre atividades:
+                           - Pausa de 5-15 minutos a cada 90-120 minutos de trabalho
+                           - Soneca após almoço limitada a 30 minutos
+                           - Intervalos para hidratação a cada 2-3 horas
                         4. Use lembretes motivacionais com emojis ✨.
-                        5. Foque na produtividade, com um ritmo equilibrado e otimizado.`
+                        5. Foque na produtividade, com um ritmo equilibrado e otimizado.
+                        6. Distribua o trabalho em blocos flexíveis ao longo do dia.
+                        7. Respeite horários importantes:
+                           - Início do dia: 8:00
+                           - Almoço: 12:00-13:00
+                           - Fim do dia: 22:00
+                        8. Distribua a hidratação ao longo do dia:
+                           - Água: 1,5L dividido em 4-6 porções
+                           - Tereré: 1,5L dividido em 3-4 porções
+                        9. Priorize um sono noturno adequado (7-8 horas)`
                     },
                     ...messageHistory,
                     {

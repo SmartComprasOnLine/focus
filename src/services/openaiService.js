@@ -132,15 +132,36 @@ Analise a rotina do usuário considerando:
 - Bem-estar (equilíbrio, exercícios)
 - Horário atual e dia da semana
 
-Regras:
-- Atividades: 5-240 minutos
-- Pausas: 5-15 min a cada 90-120 min
-- Soneca: máx 30-40 min
-- Hidratação: água e tereré distribuídos (1,5L cada)
-- Manhã: atividades importantes
-- Tarde: trabalho com pausas
-- Noite: atividades leves até 22:00
-- Sono: 7-8 horas contínuas
+Regras para duração das atividades:
+
+1. Trabalho/Estudo:
+   - Blocos focados: 90-120 minutos
+   - Pausas curtas: 5-15 minutos entre blocos
+   - Pausa longa: 30-60 minutos após 4 horas
+
+2. Exercícios/Atividade Física:
+   - Aquecimento: 5-10 minutos
+   - Atividade principal: 30-60 minutos
+   - Alongamento: 5-10 minutos
+
+3. Refeições e Hidratação:
+   - Café da manhã: 15-30 minutos
+   - Almoço/Jantar: 30-45 minutos
+   - Lanches: 10-15 minutos
+   - Hidratação: distribuir água (3,5L)
+
+4. Descanso:
+   - Soneca pós-almoço: máx 30-40 minutos
+   - Pausas para relaxamento: 10-15 minutos
+   - Preparação para dormir: 30-45 minutos
+   - Sono noturno: 7-8 horas 420-480 minutos
+
+5. Organização do dia:
+   - Manhã: atividades que exigem mais foco
+   - Tarde: alternar trabalho com pausas
+   - Noite: atividades leves após 20:00
+
+Defina a duração de cada atividade de acordo com estas regras e a rotina do usuário.
 
 Retorne apenas um JSON válido neste formato:
 {

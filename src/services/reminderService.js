@@ -4,6 +4,16 @@ const cron = require('node-cron');
 class ReminderService {
   constructor() {
     this.activeReminders = new Map(); // userId -> [cronJobs]
+    this.lastSentReminders = new Map(); // userId_activityId_timing -> timestamp
+  }
+
+  clearLastSentReminders(userId) {
+    // Clear all lastSentReminders for this user
+    for (const key of this.lastSentReminders.keys()) {
+      if (key.startsWith(userId)) {
+        this.lastSentReminders.delete(key);
+      }
+    }
   }
 
   async setupReminders(user, routine) {
@@ -15,26 +25,45 @@ class ReminderService {
       
       // Set up reminders for each activity in the plan
       routine.activities.forEach(activity => {
+        // Convert activity time to user's timezone
+        const userTime = new Date();
         const [hours, minutes] = activity.scheduledTime.split(':').map(Number);
+        userTime.setHours(hours, minutes, 0, 0);
+
+        // Adjust for timezone (America/Sao_Paulo)
+        const timezonedDate = new Date(userTime.toLocaleString('en-US', {
+          timeZone: 'America/Sao_Paulo'
+        }));
+        const tzHours = timezonedDate.getHours();
+        const tzMinutes = timezonedDate.getMinutes();
         
         // Before reminder (5 minutes before)
-        const beforeTime = this.adjustTime(hours, minutes, -5);
+        const beforeTime = this.adjustTime(tzHours, tzMinutes, -5);
         const beforeExpression = `${beforeTime.minutes} ${beforeTime.hours} * * *`;
         
         // Start reminder (at scheduled time)
-        const startExpression = `${minutes} ${hours} * * *`;
+        const startExpression = `${tzMinutes} ${tzHours} * * *`;
         
         // During reminder (15 minutes after start)
-        const duringTime = this.adjustTime(hours, minutes, 15);
+        const duringTime = this.adjustTime(tzHours, tzMinutes, 15);
         const duringExpression = `${duringTime.minutes} ${duringTime.hours} * * *`;
         
         // End reminder (at end of duration)
-        const endTime = this.adjustTime(hours, minutes, activity.duration);
+        const endTime = this.adjustTime(tzHours, tzMinutes, activity.duration);
         const endExpression = `${endTime.minutes} ${endTime.hours} * * *`;
         
         // Follow-up reminder (15 minutes after end)
-        const followUpTime = this.adjustTime(hours, minutes, activity.duration + 15);
+        const followUpTime = this.adjustTime(tzHours, tzMinutes, activity.duration + 15);
         const followUpExpression = `${followUpTime.minutes} ${followUpTime.hours} * * *`;
+
+        // Log the scheduled times for debugging
+        console.log('Reminder times for activity:', activity.activity, {
+          beforeTime: `${beforeTime.hours}:${beforeTime.minutes}`,
+          startTime: `${tzHours}:${tzMinutes}`,
+          duringTime: `${duringTime.hours}:${duringTime.minutes}`,
+          endTime: `${endTime.hours}:${endTime.minutes}`,
+          followUpTime: `${followUpTime.hours}:${followUpTime.minutes}`
+        });
 
         console.log('Setting up reminders for activity:', {
           activity: activity.activity,
@@ -106,65 +135,47 @@ class ReminderService {
 
   async sendActivityReminder(user, activity, timing = 'start') {
     try {
-      // Check for custom messages
-      if (activity.messages && activity.messages[timing]) {
-        const message = Array.isArray(activity.messages[timing]) 
-          ? activity.messages[timing][0] 
-          : activity.messages[timing];
-        await evolutionApi.sendText(user.whatsappNumber, message);
+      // Get the last sent message timestamp for this activity
+      const lastSentKey = `${user.id}_${activity._id}_${timing}`;
+      const lastSent = this.lastSentReminders.get(lastSentKey);
+      const now = Date.now();
+
+      // Prevent duplicate messages within 5 minutes
+      if (lastSent && (now - lastSent) < 5 * 60 * 1000) {
+        console.log('Skipping duplicate reminder:', {
+          activity: activity.activity,
+          timing,
+          timeSinceLastSent: (now - lastSent) / 1000
+        });
         return;
       }
 
-      // Default messages based on activity type
-      const defaultMessages = {
-        'planejamento': {
-          before: '📋 Em 5 minutos: Momento de planejar!',
-          start: '📋 Hora de planejar! Vamos organizar.',
-          during: '📋 Continue organizando.',
-          end: '📋 Hora de finalizar o planejamento.',
-          followUp: '📋 Como foi o planejamento?'
-        },
-        'trabalho': {
-          before: '💼 Em 5 minutos: Prepare-se para o trabalho!',
-          start: '💼 Hora de trabalhar!',
-          during: '💼 Mantenha o foco!',
-          end: '💼 Hora de concluir o trabalho.',
-          followUp: '💼 Como foi o trabalho?'
-        },
-        'estudo': {
-          before: '📚 Em 5 minutos: Prepare seu ambiente!',
-          start: '📚 Hora de estudar!',
-          during: '📚 Continue focado!',
-          end: '📚 Hora de concluir os estudos.',
-          followUp: '📚 Como foi o estudo?'
-        },
-        'pausa': {
-          before: '⏰ Em 5 minutos: Prepare-se para a pausa!',
-          start: '☕ Hora da pausa!',
-          during: '🧘‍♂️ Aproveite para relaxar.',
-          end: '⏰ Hora de retornar.',
-          followUp: '💪 Como foi a pausa?'
-        },
-        'revisão': {
-          before: '📊 Em 5 minutos: Prepare-se para revisar!',
-          start: '📊 Hora da revisão!',
-          during: '📊 Continue avaliando.',
-          end: '📊 Hora de concluir a revisão.',
-          followUp: '📊 Como foi a revisão?'
-        },
-        'geral': {
+      let message;
+      if (activity.messages && activity.messages[timing]) {
+        message = Array.isArray(activity.messages[timing]) 
+          ? activity.messages[timing][0] 
+          : activity.messages[timing];
+      } else {
+        // Default messages
+        const defaultMessages = {
           before: `⏰ Em 5 minutos: ${activity.activity}`,
           start: `🎯 Hora de ${activity.activity}`,
-          during: `💪 Continue com ${activity.activity}`,
+          during: `💪 Continue focado em ${activity.activity}`,
           end: `✅ Hora de concluir ${activity.activity}`,
           followUp: `🤔 Como foi ${activity.activity}?`
-        }
-      };
-
-      const message = defaultMessages[activity.type]?.[timing] || 
-                     defaultMessages['geral'][timing];
+        };
+        message = defaultMessages[timing];
+      }
       
       await evolutionApi.sendText(user.whatsappNumber, message);
+      
+      // Store the timestamp of this message
+      this.lastSentReminders.set(lastSentKey, now);
+      console.log('Reminder sent:', {
+        activity: activity.activity,
+        timing,
+        message
+      });
     } catch (error) {
       console.error('Error sending activity reminder:', error);
       throw error;
@@ -218,6 +229,7 @@ class ReminderService {
           reminder.job.stop();
         });
         this.activeReminders.delete(userId);
+        this.clearLastSentReminders(userId);
         console.log(`Cancelled reminders for user ${userId}`);
       }
     } catch (error) {

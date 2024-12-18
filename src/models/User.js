@@ -130,6 +130,57 @@ const preferencesSchema = new mongoose.Schema({
     }
 });
 
+const achievementSchema = new mongoose.Schema({
+    type: {
+        type: String,
+        enum: ['streak', 'milestone', 'challenge', 'improvement'],
+        required: true
+    },
+    name: String,
+    description: String,
+    earnedAt: {
+        type: Date,
+        default: Date.now
+    },
+    value: Number, // points or streak count
+    icon: String
+});
+
+const analyticsSchema = new mongoose.Schema({
+    date: {
+        type: Date,
+        required: true
+    },
+    metrics: {
+        focusScore: {
+            type: Number,
+            min: 0,
+            max: 100
+        },
+        productivityScore: {
+            type: Number,
+            min: 0,
+            max: 100
+        },
+        energyLevel: {
+            type: Number,
+            min: 0,
+            max: 100
+        },
+        tasksCompleted: Number,
+        totalFocusTime: Number, // minutes
+        totalBreakTime: Number, // minutes
+        distractions: Number,
+        streakDays: Number
+    },
+    patterns: {
+        mostProductiveTime: String,
+        commonChallenges: [String],
+        successfulStrategies: [String],
+        improvementAreas: [String]
+    }
+});
+
 const planHistorySchema = new mongoose.Schema({
     routineId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -154,13 +205,78 @@ const planHistorySchema = new mongoose.Schema({
             type: Number,
             min: 0,
             max: 100
-        }
+        },
+        energyLevels: [{
+            time: String,
+            level: Number // 0-100
+        }],
+        distractions: [{
+            time: String,
+            type: String,
+            duration: Number // minutes
+        }],
+        improvements: [{
+            metric: String,
+            value: Number,
+            date: Date
+        }]
     },
     feedback: {
         challenges: [String],
         improvements: [String],
-        notes: String
+        notes: String,
+        mood: {
+            type: String,
+            enum: ['excellent', 'good', 'neutral', 'tired', 'stressed']
+        },
+        energyRating: {
+            type: Number,
+            min: 1,
+            max: 5
+        }
     }
+});
+
+const gamificationSchema = new mongoose.Schema({
+    level: {
+        type: Number,
+        default: 1
+    },
+    experience: {
+        type: Number,
+        default: 0
+    },
+    streaks: {
+        current: {
+            type: Number,
+            default: 0
+        },
+        longest: {
+            type: Number,
+            default: 0
+        },
+        lastUpdated: Date
+    },
+    achievements: [achievementSchema],
+    points: {
+        total: {
+            type: Number,
+            default: 0
+        },
+        history: [{
+            date: Date,
+            amount: Number,
+            reason: String
+        }]
+    },
+    challenges: [{
+        name: String,
+        description: String,
+        progress: Number,
+        target: Number,
+        completedAt: Date,
+        reward: Number // points
+    }]
 });
 
 const userSchema = new mongoose.Schema({
@@ -168,6 +284,8 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    analytics: [analyticsSchema],
+    gamification: gamificationSchema,
     email: {
         type: String,
         unique: true,
@@ -232,6 +350,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // Methods
+// Analytics Methods
 userSchema.methods.updateMetrics = async function(metrics) {
     if (this.activeRoutineId) {
         const currentPlan = this.planHistory.find(
@@ -240,11 +359,143 @@ userSchema.methods.updateMetrics = async function(metrics) {
         
         if (currentPlan) {
             Object.assign(currentPlan.metrics, metrics);
+
+            // Update daily analytics
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let dailyAnalytics = this.analytics.find(a => 
+                a.date.getTime() === today.getTime()
+            );
+
+            if (!dailyAnalytics) {
+                dailyAnalytics = {
+                    date: today,
+                    metrics: {
+                        focusScore: 0,
+                        productivityScore: 0,
+                        energyLevel: 0,
+                        tasksCompleted: 0,
+                        totalFocusTime: 0,
+                        totalBreakTime: 0,
+                        distractions: 0,
+                        streakDays: this.gamification?.streaks?.current || 0
+                    },
+                    patterns: {
+                        mostProductiveTime: '',
+                        commonChallenges: [],
+                        successfulStrategies: [],
+                        improvementAreas: []
+                    }
+                };
+                this.analytics.push(dailyAnalytics);
+            }
+
+            // Update analytics metrics
+            Object.assign(dailyAnalytics.metrics, {
+                focusScore: Math.round((metrics.focusTime / (metrics.focusTime + metrics.breakTime)) * 100),
+                productivityScore: metrics.productivity,
+                totalFocusTime: (dailyAnalytics.metrics.totalFocusTime || 0) + metrics.focusTime,
+                totalBreakTime: (dailyAnalytics.metrics.totalBreakTime || 0) + metrics.breakTime,
+                tasksCompleted: (dailyAnalytics.metrics.tasksCompleted || 0) + 1
+            });
+
             await this.save();
+            await this.updateGamification(metrics);
         }
     }
 };
 
+// Gamification Methods
+userSchema.methods.updateGamification = async function(metrics) {
+    if (!this.gamification) {
+        this.gamification = {
+            level: 1,
+            experience: 0,
+            streaks: { current: 0, longest: 0 },
+            points: { total: 0, history: [] },
+            achievements: [],
+            challenges: []
+        };
+    }
+
+    // Update streaks
+    const today = new Date();
+    if (this.gamification.streaks.lastUpdated) {
+        const lastUpdate = new Date(this.gamification.streaks.lastUpdated);
+        const daysDiff = Math.floor((today - lastUpdate) / (1000 * 60 * 60 * 24));
+        
+        if (daysDiff === 1) {
+            this.gamification.streaks.current++;
+            this.gamification.streaks.longest = Math.max(
+                this.gamification.streaks.longest,
+                this.gamification.streaks.current
+            );
+        } else if (daysDiff > 1) {
+            this.gamification.streaks.current = 1;
+        }
+    }
+    this.gamification.streaks.lastUpdated = today;
+
+    // Award points based on metrics
+    const points = Math.round(
+        (metrics.productivity || 0) +
+        (metrics.focusTime / 30) + // Points per 30 min of focus
+        (this.gamification.streaks.current * 10) // Streak bonus
+    );
+
+    this.gamification.points.total += points;
+    this.gamification.points.history.push({
+        date: today,
+        amount: points,
+        reason: 'Daily activity completion'
+    });
+
+    // Update experience and level
+    this.gamification.experience += points;
+    const newLevel = Math.floor(Math.sqrt(this.gamification.experience / 100)) + 1;
+    if (newLevel > this.gamification.level) {
+        this.gamification.level = newLevel;
+        await this.awardAchievement('milestone', `Reached Level ${newLevel}!`, newLevel);
+    }
+
+    // Check for achievements
+    if (this.gamification.streaks.current === 7) {
+        await this.awardAchievement('streak', 'Week Warrior', 7);
+    } else if (this.gamification.streaks.current === 30) {
+        await this.awardAchievement('streak', 'Monthly Master', 30);
+    }
+
+    if (metrics.productivity >= 90) {
+        await this.awardAchievement('improvement', 'Productivity Star', 90);
+    }
+
+    await this.save();
+};
+
+userSchema.methods.awardAchievement = async function(type, name, value) {
+    if (!this.gamification.achievements.find(a => a.name === name)) {
+        this.gamification.achievements.push({
+            type,
+            name,
+            description: `Earned for achieving ${name}`,
+            value,
+            earnedAt: new Date(),
+            icon: '🏆'
+        });
+
+        // Bonus points for achievement
+        const bonusPoints = value * 10;
+        this.gamification.points.total += bonusPoints;
+        this.gamification.points.history.push({
+            date: new Date(),
+            amount: bonusPoints,
+            reason: `Achievement: ${name}`
+        });
+    }
+};
+
+// Existing Methods
 userSchema.methods.completePlan = async function(feedback) {
     if (this.activeRoutineId) {
         const currentPlan = this.planHistory.find(
@@ -257,6 +508,13 @@ userSchema.methods.completePlan = async function(feedback) {
             currentPlan.feedback = feedback;
             this.activeRoutineId = null;
             await this.save();
+            
+            // Award completion points
+            await this.updateGamification({
+                productivity: 100,
+                focusTime: 480, // 8 hours
+                breakTime: 120  // 2 hours
+            });
         }
     }
 };
@@ -273,7 +531,9 @@ userSchema.methods.abandonPlan = async function(reason) {
             currentPlan.feedback = {
                 challenges: [reason],
                 improvements: [],
-                notes: 'Plan abandoned by user'
+                notes: 'Plan abandoned by user',
+                mood: 'stressed',
+                energyRating: 2
             };
             this.activeRoutineId = null;
             await this.save();
@@ -300,6 +560,30 @@ userSchema.methods.getMessageHistory = function() {
         role: msg.role,
         content: msg.content
     }));
+};
+
+// Analytics Helper Methods
+userSchema.methods.getProductivityTrends = function() {
+    const last7Days = this.analytics.slice(-7);
+    return {
+        focusScores: last7Days.map(day => day.metrics.focusScore),
+        productivityScores: last7Days.map(day => day.metrics.productivityScore),
+        mostProductiveTimes: last7Days.map(day => day.patterns.mostProductiveTime),
+        commonChallenges: [...new Set(last7Days.flatMap(day => day.patterns.commonChallenges))],
+        improvementAreas: [...new Set(last7Days.flatMap(day => day.patterns.improvementAreas))]
+    };
+};
+
+userSchema.methods.getGamificationStatus = function() {
+    return {
+        level: this.gamification.level,
+        experience: this.gamification.experience,
+        nextLevelExp: (this.gamification.level + 1) ** 2 * 100,
+        streaks: this.gamification.streaks,
+        recentAchievements: this.gamification.achievements.slice(-5),
+        points: this.gamification.points.total,
+        activeChallenges: this.gamification.challenges.filter(c => !c.completedAt)
+    };
 };
 
 module.exports = mongoose.model('User', userSchema);

@@ -62,17 +62,17 @@ class ReminderService {
         // Log the scheduled times for debugging
         console.log(`Configurando lembretes para: ${activity.activity} (${activity.scheduledTime})`, {
           'Horário original': activity.scheduledTime,
-          'Lembrete antes': `${beforeTime.hours}:${String(beforeTime.minutes).padStart(2, '0')}`,
-          'Início': `${tzHours}:${String(tzMinutes).padStart(2, '0')}`,
-          'Acompanhamento': `${followUpTime.hours}:${String(followUpTime.minutes).padStart(2, '0')}`
+          'Lembrete antes': this.formatTime(beforeTime.hours, beforeTime.minutes),
+          'Início': this.formatTime(tzHours, tzMinutes),
+          'Acompanhamento': this.formatTime(followUpTime.hours, followUpTime.minutes)
         });
 
         // Log cron expressions for verification
         console.log('Expressões cron:', {
           'Atividade': activity.activity,
-          'Antes': `${beforeExpression} (${beforeTime.hours}:${String(beforeTime.minutes).padStart(2, '0')})`,
-          'Início': `${startExpression} (${tzHours}:${String(tzMinutes).padStart(2, '0')})`,
-          'Acompanhamento': `${followUpExpression} (${followUpTime.hours}:${String(followUpTime.minutes).padStart(2, '0')})`
+          'Antes': `${beforeExpression} (${this.formatTime(beforeTime.hours, beforeTime.minutes)})`,
+          'Início': `${startExpression} (${this.formatTime(tzHours, tzMinutes)})`,
+          'Acompanhamento': `${followUpExpression} (${this.formatTime(followUpTime.hours, followUpTime.minutes)})`
         });
         
         // Create cron jobs
@@ -108,11 +108,17 @@ class ReminderService {
   }
 
   adjustTime(hours, minutes, adjustment) {
-    const totalMinutes = hours * 60 + minutes + adjustment;
+    // Ensure positive values for modulo operation
+    const totalMinutes = (hours * 60 + minutes + adjustment + 1440) % 1440;
+    
     return {
-      hours: Math.floor((totalMinutes + 1440) % 1440 / 60), // Add 1440 (24h) to handle negative times
-      minutes: Math.floor((totalMinutes + 1440) % 60)
+      hours: Math.floor(totalMinutes / 60),
+      minutes: Math.floor(totalMinutes % 60)
     };
+  }
+
+  formatTime(hours, minutes) {
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   }
 
   async sendActivityReminder(user, activity, timing = 'start') {

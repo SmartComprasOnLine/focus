@@ -1,33 +1,45 @@
-# Focus - TDAH Coach
+# Focus - Assistente de Produtividade e Rotina
 
-Um sistema MicroSaaS integrado à Evolution API para WhatsApp, focado em ajudar pessoas com TDAH a organizarem suas rotinas. O sistema atua como um coach pessoal, auxiliando o usuário a melhorar sua produtividade, foco e disposição.
+Um assistente pessoal inteligente via WhatsApp focado em ajudar pessoas a manterem uma rotina produtiva e equilibrada. O sistema atua como um coach pessoal, auxiliando na organização do tempo, gestão de atividades e manutenção do equilíbrio entre trabalho e vida pessoal.
 
-## Funcionalidades
+## Principais Funcionalidades
 
-### 1. Gerenciamento de Webhook
-- Processamento de eventos da Evolution API (mensagens de texto, áudio e imagem)
-- Respostas personalizadas baseadas no tipo de mensagem
-- Armazenamento de interações no banco de dados
+### 1. Gestão Inteligente de Rotina
+- Criação de planos personalizados considerando:
+  - Horários de trabalho fixos
+  - Compromissos específicos por dia da semana
+  - Necessidades de descanso e pausas
+  - Equilíbrio trabalho-família
+- Adaptação dinâmica do plano conforme feedback
 
-### 2. Período de Teste Gratuito
-- 7 dias de teste gratuito
-- Registro automático de novos usuários
-- Notificação de término do período de teste
-- Transição suave para assinatura paga
+### 2. Sistema de Lembretes Inteligentes
+- Lembretes estratégicos para cada atividade:
+  - Preparação (5 minutos antes)
+  - Início da atividade
+  - Acompanhamento e conclusão
+- Suporte para diferentes agendas por dia
+- Configuração flexível de frequência
+- Mensagens motivacionais personalizadas
 
-### 3. Gestão de Assinaturas
-- Integração com Stripe para processamento de pagamentos
-- Planos disponíveis:
-  - Mensal: R$ 99,00
-  - Anual: R$ 999,00 (economia de 2 meses)
-- Gerenciamento automático de status de assinatura
-- Webhook para confirmação de pagamentos
+### 3. Acompanhamento de Progresso
+- Feedback após cada atividade
+- Ajustes baseados no desempenho
+- Sugestões de melhorias
+- Análise de padrões de produtividade
 
-### 4. Coach Pessoal
-- Interação personalizada baseada em IA
-- Geração de planos personalizados
-- Ajustes dinâmicos no plano
-- Sistema de notificações e lembretes
+### 4. Assistente Pessoal IA
+- Interação natural via WhatsApp
+- Respostas contextualizadas
+- Sugestões personalizadas
+- Adaptação às necessidades individuais
+
+## Benefícios
+
+- 🎯 Melhor gestão do tempo
+- ⚖️ Equilíbrio trabalho-vida
+- 📈 Aumento de produtividade
+- 🧘‍♂️ Redução de estresse
+- 💪 Desenvolvimento de hábitos saudáveis
 
 ## Tecnologias
 
@@ -55,39 +67,40 @@ npm install
 cp .env.example .env
 ```
 
-Edite o arquivo `.env` com suas configurações:
-```env
-# MongoDB
-MONGODB_URI=mongodb://localhost:27017/focus_adhd
-
-# Evolution API
-EVOLUTION_API_URL=https://evo.meuchatinteligente.com.br
-EVOLUTION_API_KEY=your_api_key
-EVOLUTION_INSTANCE=your_instance
-
-# OpenAI
-OPENAI_API_KEY=your_openai_key
-
-# Stripe
-STRIPE_SECRET_KEY=your_stripe_secret_key
-STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
-
-# Planos (em centavos)
-PLAN_MONTHLY_PRICE=9900
-PLAN_YEARLY_PRICE=99900
-```
-
 4. Inicie o servidor:
 ```bash
 npm start
 ```
 
-## Scripts Úteis
+## Planos
 
-- `npm run dev`: Inicia o servidor em modo desenvolvimento
-- `node src/scripts/checkTrialEnding.js`: Verifica usuários com trial próximo do fim
-- `node src/scripts/checkUserSubscription.js`: Verifica status de assinatura
-- `node clearDatabase.js`: Limpa o banco de dados (apenas desenvolvimento)
+### Teste Gratuito (7 dias)
+- Acesso a todas as funcionalidades
+- Plano personalizado
+- Lembretes ilimitados
+
+### Assinatura
+- Mensal: R$ 99,00
+- Anual: R$ 999,00 (economia de 2 meses)
+- Suporte contínuo
+- Ajustes ilimitados
+
+## Como Funciona
+
+1. **Primeira Interação**
+   - Análise inicial da rotina
+   - Criação do plano personalizado
+   - Configuração dos lembretes
+
+2. **Uso Diário**
+   - Lembretes nos momentos certos
+   - Acompanhamento de atividades
+   - Ajustes conforme necessário
+
+3. **Evolução Contínua**
+   - Análise de padrões
+   - Sugestões de melhorias
+   - Adaptação às mudanças
 
 ## Estrutura do Projeto
 
@@ -96,39 +109,20 @@ src/
 ├── controllers/        # Controladores da aplicação
 ├── models/            # Modelos do MongoDB
 ├── routes/            # Rotas da API
-├── scripts/           # Scripts utilitários
-├── services/          # Serviços (Evolution API, Stripe, etc)
-└── utils/             # Funções utilitárias
+├── services/          # Serviços principais
+│   ├── openaiService.js       # Integração com IA
+│   ├── reminderService.js     # Gestão de lembretes
+│   ├── evolutionApi.js        # Integração WhatsApp
+│   └── stripeService.js       # Pagamentos
+└── scripts/           # Scripts utilitários
 ```
-
-## Fluxo do Usuário
-
-1. **Primeira Interação**
-   - Mensagem de boas-vindas
-   - Registro no banco de dados
-   - Início do período de teste
-
-2. **Durante o Teste**
-   - Coleta de dados
-   - Geração de plano personalizado
-   - Envio de notificações
-
-3. **Fim do Teste**
-   - Notificação de término
-   - Opções de assinatura
-   - Processo de pagamento
-
-4. **Assinatura Ativa**
-   - Acesso contínuo
-   - Suporte do coach
-   - Ajustes no plano
 
 ## Contribuição
 
 1. Faça um Fork do projeto
-2. Crie uma Branch para sua Feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a Branch (`git push origin feature/AmazingFeature`)
+2. Crie uma Branch para sua Feature (`git checkout -b feature/NovaFuncionalidade`)
+3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
+4. Push para a Branch (`git push origin feature/NovaFuncionalidade`)
 5. Abra um Pull Request
 
 ## Licença

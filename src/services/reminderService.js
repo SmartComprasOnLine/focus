@@ -178,25 +178,70 @@ class ReminderService {
         );
       }
 
-      // Atualiza plano atual
-      const activities = routine.activities.map(activity => ({
-        activity: activity.activity,
-        scheduledTime: activity.scheduledTime,
-        duration: activity.duration,
-        type: activity.type || 'geral',
-        status: 'pending',
-        schedule: {
-          days: activity.schedule?.days || ['*'],
-          repeat: activity.schedule?.repeat || 'daily'
-        }
-      }));
+      try {
+        // Valida e formata as atividades
+        const formattedActivities = routine.activities.map(activity => {
+          // Valida formato do horário
+          if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(activity.scheduledTime)) {
+            throw new Error(`Invalid time format for activity "${activity.activity}": ${activity.scheduledTime}`);
+          }
 
-      await user.updateOne({
-        currentPlan: {
-          activities,
+          // Valida duração
+          if (activity.duration < 5 || activity.duration > 480) {
+            throw new Error(`Invalid duration for activity "${activity.activity}": ${activity.duration}`);
+          }
+
+          // Formata dias da semana
+          const days = activity.schedule?.days?.map(day => 
+            day.toLowerCase()
+          ) || ['*'];
+
+          if (!days.every(day => 
+            day === '*' || 
+            ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].includes(day)
+          )) {
+            throw new Error(`Invalid days format for activity "${activity.activity}": ${days.join(', ')}`);
+          }
+
+          return {
+            activity: activity.activity,
+            scheduledTime: activity.scheduledTime,
+            duration: activity.duration,
+            type: activity.type || 'routine',
+            status: 'pending',
+            schedule: {
+              days,
+              repeat: activity.schedule?.repeat || 'daily'
+            }
+          };
+        });
+
+        // Atualiza plano no banco
+        await user.updateOne({
+          $set: {
+            'currentPlan.activities': formattedActivities,
+            'currentPlan.lastUpdate': new Date()
+          }
+        }, { 
+          runValidators: true,
+          new: true 
+        });
+
+        // Atualiza usuário em memória
+        user.currentPlan = {
+          activities: formattedActivities,
           lastUpdate: new Date()
-        }
-      });
+        };
+
+        console.log('Plano atualizado com sucesso:', {
+          userId: user.id,
+          activitiesCount: formattedActivities.length,
+          lastUpdate: new Date()
+        });
+      } catch (error) {
+        console.error('Erro ao atualizar plano:', error);
+        throw new Error(`Erro ao atualizar plano: ${error.message}`);
+      }
 
       // Configura novos lembretes
       const reminders = [];

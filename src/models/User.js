@@ -306,29 +306,60 @@ const userSchema = new mongoose.Schema({
         ref: 'Routine'
     },
     currentPlan: {
-        activities: [{
-            activity: String,
-            scheduledTime: String,
-            duration: Number,
-            type: String,
-            status: {
-                type: String,
-                enum: ['pending', 'active', 'completed', 'skipped'],
-                default: 'pending'
-            },
-            schedule: {
-                days: [String],
-                repeat: {
+        type: {
+            activities: [{
+                activity: {
                     type: String,
-                    enum: ['daily', 'weekdays', 'weekends', 'custom'],
-                    default: 'daily'
+                    required: true
+                },
+                scheduledTime: {
+                    type: String,
+                    required: true,
+                    match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
+                },
+                duration: {
+                    type: Number,
+                    required: true,
+                    min: 5,
+                    max: 480
+                },
+                type: {
+                    type: String,
+                    default: 'routine'
+                },
+                status: {
+                    type: String,
+                    enum: ['pending', 'active', 'completed', 'skipped'],
+                    default: 'pending'
+                },
+                schedule: {
+                    days: {
+                        type: [String],
+                        default: ['*'],
+                        validate: {
+                            validator: function(v) {
+                                return v.every(day => 
+                                    day === '*' || 
+                                    ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].includes(day.toLowerCase())
+                                );
+                            },
+                            message: 'Invalid day format'
+                        }
+                    },
+                    repeat: {
+                        type: String,
+                        enum: ['daily', 'weekdays', 'weekends', 'custom'],
+                        default: 'daily'
+                    }
                 }
+            }],
+            lastUpdate: {
+                type: Date,
+                default: Date.now
             }
-        }],
-        lastUpdate: {
-            type: Date,
-            default: Date.now
-        }
+        },
+        required: false,
+        _id: false
     },
     subscription: {
         status: {

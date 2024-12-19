@@ -179,42 +179,43 @@ class ReminderService {
       }
 
       try {
-        // Valida e formata as atividades
-        const formattedActivities = routine.activities.map(activity => {
-          // Valida formato do horário
-          if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(activity.scheduledTime)) {
-            throw new Error(`Invalid time format for activity "${activity.activity}": ${activity.scheduledTime}`);
+        // Valida plano
+        const { errors, warnings } = this.validatePlan(routine.activities);
+
+        if (errors.length > 0) {
+          // Envia mensagem de erro para o usuário
+          await evolutionApi.sendText(
+            user.whatsappNumber,
+            '*Encontrei alguns problemas no seu plano:* ❌\n\n' +
+            errors.map(err => `• ${err}`).join('\n') +
+            '\n\nPor favor, corrija esses problemas e tente novamente! 🙏'
+          );
+          throw new Error('Validation failed: ' + errors.join(', '));
+        }
+
+        if (warnings.length > 0) {
+          // Envia avisos para o usuário
+          await evolutionApi.sendText(
+            user.whatsappNumber,
+            '*Algumas observações sobre seu plano:* ⚠️\n\n' +
+            warnings.map(warn => `• ${warn}`).join('\n') +
+            '\n\nDeseja continuar mesmo assim? Responda "sim" para confirmar ou me conte o que gostaria de ajustar. 🤔'
+          );
+          return;
+        }
+
+        // Formata atividades
+        const formattedActivities = routine.activities.map(activity => ({
+          activity: activity.activity,
+          scheduledTime: activity.scheduledTime,
+          duration: activity.duration,
+          type: activity.type || 'routine',
+          status: 'pending',
+          schedule: {
+            days: activity.schedule?.days?.map(day => day.toLowerCase()) || ['*'],
+            repeat: activity.schedule?.repeat || 'daily'
           }
-
-          // Valida duração
-          if (activity.duration < 5 || activity.duration > 480) {
-            throw new Error(`Invalid duration for activity "${activity.activity}": ${activity.duration}`);
-          }
-
-          // Formata dias da semana
-          const days = activity.schedule?.days?.map(day => 
-            day.toLowerCase()
-          ) || ['*'];
-
-          if (!days.every(day => 
-            day === '*' || 
-            ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].includes(day)
-          )) {
-            throw new Error(`Invalid days format for activity "${activity.activity}": ${days.join(', ')}`);
-          }
-
-          return {
-            activity: activity.activity,
-            scheduledTime: activity.scheduledTime,
-            duration: activity.duration,
-            type: activity.type || 'routine',
-            status: 'pending',
-            schedule: {
-              days,
-              repeat: activity.schedule?.repeat || 'daily'
-            }
-          };
-        });
+        }));
 
         // Atualiza plano no banco
         await user.updateOne({
@@ -239,7 +240,28 @@ class ReminderService {
           lastUpdate: new Date()
         });
       } catch (error) {
-        console.error('Erro ao atualizar plano:', error);
+        console.error('Erro ao atualizar plano:', {
+          userId: user.id,
+          error: error.message,
+          stack: error.stack
+        });
+
+        // Envia mensagem de erro amigável para o usuário
+        await evolutionApi.sendText(
+          user.whatsappNumber,
+          '*Ops! Tive um problema ao atualizar seu plano.* 😅\n\n' +
+          'Parece que houve um erro com:\n' +
+          (error.message.includes('time format') ? 
+            '• Formato de horário inválido (use HH:MM)\n' :
+           error.message.includes('duration') ?
+            '• Duração inválida (mínimo 5min, máximo 8h)\n' :
+           error.message.includes('days format') ?
+            '• Dias da semana inválidos\n' :
+            '• Formato dos dados\n'
+          ) +
+          '\nPor favor, tente novamente com valores válidos! 🙏'
+        );
+
         throw new Error(`Erro ao atualizar plano: ${error.message}`);
       }
 
@@ -312,6 +334,65 @@ class ReminderService {
 
   formatTime(hours, minutes) {
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  }
+
+  validatePlan(activities) {
+    const errors = [];
+    const warnings = [];
+
+    activities.forEach((activity, index) => {
+      // Validar formato de horário
+      if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(activity.scheduledTime)) {
+        errors.push(`Horário inválido em "${activity.activity}": ${activity.scheduledTime}`);
+      }
+
+      // Validar duração
+      if (activity.duration < 5 || activity.duration > 480) {
+        errors.push(`Duração inválida em "${activity.activity}": ${activity.duration}min`);
+      }
+
+      // Validar sobreposição
+      if (index > 0) {
+        const prevActivity = activities[index - 1];
+        const prevEnd = this.addMinutes(prevActivity.scheduledTime, prevActivity.duration);
+        if (this.isTimeBefore(activity.scheduledTime, prevEnd)) {
+          warnings.push(`Possível sobreposição entre "${prevActivity.activity}" e "${activity.activity}"`);
+        }
+      }
+
+      // Validar intervalos muito longos
+      if (index > 0) {
+        const prevActivity = activities[index - 1];
+        const prevEnd = this.addMinutes(prevActivity.scheduledTime, prevActivity.duration);
+        const gap = this.getMinutesBetween(prevEnd, activity.scheduledTime);
+        if (gap > 120) { // 2 horas
+          warnings.push(`Intervalo longo (${gap}min) entre "${prevActivity.activity}" e "${activity.activity}"`);
+        }
+      }
+    });
+
+    return { errors, warnings };
+  }
+
+  addMinutes(time, minutes) {
+    const [hours, mins] = time.split(':').map(Number);
+    const totalMinutes = hours * 60 + mins + minutes;
+    return this.formatTime(
+      Math.floor(totalMinutes / 60) % 24,
+      totalMinutes % 60
+    );
+  }
+
+  isTimeBefore(time1, time2) {
+    const [h1, m1] = time1.split(':').map(Number);
+    const [h2, m2] = time2.split(':').map(Number);
+    return h1 < h2 || (h1 === h2 && m1 < m2);
+  }
+
+  getMinutesBetween(time1, time2) {
+    const [h1, m1] = time1.split(':').map(Number);
+    const [h2, m2] = time2.split(':').map(Number);
+    return (h2 * 60 + m2) - (h1 * 60 + m1);
   }
 
   async sendActivityReminder(user, activity, timing = 'start') {

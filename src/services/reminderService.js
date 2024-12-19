@@ -21,33 +21,78 @@ class ReminderService {
       const suggestions = this.analyzePlan(routine.activities);
 
       if (suggestions.length > 0) {
-        // Formata mensagem de sugestões
-        let message = '*Algumas sugestões para otimizar seu plano:* 💡\n\n';
-        
+        // Agrupa e formata sugestões
         const groupedSuggestions = suggestions.reduce((acc, sugg) => {
           if (!acc[sugg.type]) acc[sugg.type] = [];
           acc[sugg.type].push(sugg.message);
           return acc;
         }, {});
 
-        if (groupedSuggestions.overlap) {
-          message += '*Ajustes de Horário:*\n' + 
-                    groupedSuggestions.overlap.map(s => `• ${s}`).join('\n') + '\n\n';
-        }
+        // Personaliza mensagem por período do dia
+        const now = new Date();
+        const currentHour = now.getHours();
+        const period = currentHour < 12 ? 'manhã' : currentHour < 18 ? 'tarde' : 'noite';
         
-        if (groupedSuggestions.long_work) {
-          message += '*Pausas Sugeridas:*\n' + 
-                    groupedSuggestions.long_work.map(s => `• ${s}`).join('\n') + '\n\n';
-        }
-        
-        if (groupedSuggestions.work_balance || groupedSuggestions.meal_time) {
-          message += '*Bem-estar:*\n' + 
-                    [...(groupedSuggestions.work_balance || []), 
-                     ...(groupedSuggestions.meal_time || [])]
-                    .map(s => `• ${s}`).join('\n') + '\n\n';
-        }
+        const greetings = {
+          'manhã': '🌅 Bom dia! Vamos organizar seu dia?',
+          'tarde': '☀️ Boa tarde! Vamos otimizar sua rotina?',
+          'noite': '🌙 Boa noite! Vamos ajustar seu planejamento?'
+        };
 
-        message += '_Estas são apenas sugestões para seu bem-estar. Você pode continuar com seu plano atual ou fazer ajustes como preferir!_ ✨';
+        let message = `${greetings[period]}\n\n`;
+        message += '*Analisei seu plano e tenho algumas sugestões:* 💡\n\n';
+
+        // Organiza sugestões por prioridade
+        const sections = [
+          {
+            title: '⚡ Principais Ajustes:',
+            types: ['overlap', 'short_break'],
+            emoji: '•'
+          },
+          {
+            title: '🎯 Otimização de Tempo:',
+            types: ['duration', 'period_balance'],
+            emoji: '•'
+          },
+          {
+            title: '🧘‍♂️ Bem-estar:',
+            types: ['break', 'work_balance'],
+            emoji: '•'
+          }
+        ];
+
+        sections.forEach(section => {
+          const sectionSuggestions = section.types
+            .flatMap(type => groupedSuggestions[type] || []);
+          
+          if (sectionSuggestions.length > 0) {
+            message += `${section.title}\n`;
+            sectionSuggestions.forEach(sugg => {
+              message += `${section.emoji} ${sugg}\n`;
+            });
+            message += '\n';
+          }
+        });
+
+        // Adiciona dicas personalizadas
+        const tips = {
+          'manhã': [
+            '💡 Dica: Comece com as tarefas mais importantes!',
+            '💪 Sua energia está no pico pela manhã'
+          ],
+          'tarde': [
+            '💡 Dica: Alterne entre tarefas leves e pesadas',
+            '🎯 Mantenha o foco com pausas estratégicas'
+          ],
+          'noite': [
+            '💡 Dica: Priorize atividades mais leves',
+            '🌙 Prepare-se para um bom descanso'
+          ]
+        };
+
+        message += `\n${tips[period][0]}\n${tips[period][1]}\n\n`;
+        message += '_Estas sugestões visam seu bem-estar e produtividade._ ✨\n';
+        message += '_Adapte conforme sua necessidade!_ 💪';
 
         await evolutionApi.sendText(user.whatsappNumber, message);
       }
@@ -175,68 +220,114 @@ class ReminderService {
     let continuousWorkMinutes = 0;
     let lastBreakTime = null;
 
+    // Agrupa atividades por dia e período
     const dailyActivities = activities.reduce((acc, activity) => {
       const days = activity.schedule?.days || ['*'];
+      const [hours] = activity.scheduledTime.split(':').map(Number);
+      const period = hours < 12 ? 'manhã' : hours < 18 ? 'tarde' : 'noite';
+      
       days.forEach(day => {
-        if (!acc[day]) acc[day] = [];
-        acc[day].push(activity);
+        if (!acc[day]) acc[day] = { manhã: [], tarde: [], noite: [] };
+        acc[day][period].push(activity);
       });
       return acc;
     }, {});
 
-    Object.entries(dailyActivities).forEach(([day, dayActivities]) => {
-      dayActivities.sort((a, b) => {
-        const [aHours, aMinutes] = a.scheduledTime.split(':').map(Number);
-        const [bHours, bMinutes] = b.scheduledTime.split(':').map(Number);
-        return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
-      });
-
+    Object.entries(dailyActivities).forEach(([day, periods]) => {
       let dayWorkMinutes = 0;
+      let morningActivities = periods.manhã.length;
+      let eveningActivities = periods.noite.length;
 
-      dayActivities.forEach((activity, index) => {
-        if (index > 0) {
-          const prevActivity = dayActivities[index - 1];
-          const gap = this.getMinutesBetween(
-            this.addMinutes(prevActivity.scheduledTime, prevActivity.duration),
-            activity.scheduledTime
-          );
-          
-          if (gap < 0) {
-            suggestions.push({
-              type: 'overlap',
-              message: `Considere ajustar o horário de "${activity.activity}" para evitar sobreposição`
-            });
+      // Analisa distribuição do dia
+      if (morningActivities === 0) {
+        suggestions.push({
+          type: 'period_balance',
+          message: 'Começar o dia cedo pode aumentar sua produtividade! 🌅'
+        });
+      }
+
+      if (eveningActivities > 3) {
+        suggestions.push({
+          type: 'period_balance',
+          message: 'Muitas atividades à noite podem afetar seu descanso 🌙'
+        });
+      }
+
+      // Analisa cada período
+      Object.entries(periods).forEach(([period, periodActivities]) => {
+        periodActivities.sort((a, b) => {
+          const [aHours, aMinutes] = a.scheduledTime.split(':').map(Number);
+          const [bHours, bMinutes] = b.scheduledTime.split(':').map(Number);
+          return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
+        });
+
+        periodActivities.forEach((activity, index) => {
+          // Verifica sobreposições
+          if (index > 0) {
+            const prevActivity = periodActivities[index - 1];
+            const gap = this.getMinutesBetween(
+              this.addMinutes(prevActivity.scheduledTime, prevActivity.duration),
+              activity.scheduledTime
+            );
+            
+            if (gap < 0) {
+              suggestions.push({
+                type: 'overlap',
+                message: `Atividades "${prevActivity.activity}" e "${activity.activity}" estão sobrepostas`
+              });
+            } else if (gap < 5) {
+              suggestions.push({
+                type: 'short_break',
+                message: `Considere um pequeno intervalo entre "${prevActivity.activity}" e "${activity.activity}"`
+              });
+            }
           }
-        }
 
-        const isBreak = this.isBreakActivity(activity);
-        if (!isBreak) {
-          dayWorkMinutes += activity.duration;
-          continuousWorkMinutes += activity.duration;
-        } else {
-          continuousWorkMinutes = 0;
-          lastBreakTime = activity.scheduledTime;
-        }
+          // Analisa duração e pausas
+          const isBreak = this.isBreakActivity(activity);
+          if (!isBreak) {
+            dayWorkMinutes += activity.duration;
+            continuousWorkMinutes += activity.duration;
 
-        if (continuousWorkMinutes > 180) {
+            // Sugestões específicas por período
+            if (period === 'manhã' && activity.duration > 90) {
+              suggestions.push({
+                type: 'duration',
+                message: 'Atividades mais curtas pela manhã ajudam a manter o foco ⚡'
+              });
+            }
+
+            if (period === 'tarde' && continuousWorkMinutes > 120) {
+              suggestions.push({
+                type: 'break',
+                message: 'Uma pausa à tarde ajuda a manter a energia! ☀️'
+              });
+            }
+          } else {
+            continuousWorkMinutes = 0;
+            lastBreakTime = activity.scheduledTime;
+          }
+        });
+
+        // Verifica pausas por período
+        if (!periodActivities.some(a => this.isBreakActivity(a)) && periodActivities.length > 2) {
+          const messages = {
+            'manhã': 'Uma pausa pela manhã ajuda a manter o ritmo! 🌅',
+            'tarde': 'Intervalos à tarde mantêm sua produtividade! ☀️',
+            'noite': 'Momentos de descanso à noite são importantes! 🌙'
+          };
           suggestions.push({
-            type: 'long_work',
-            message: `Uma pausa após "${activity.activity}" pode ajudar sua produtividade`
+            type: 'break',
+            message: messages[period]
           });
         }
       });
 
+      // Analisa carga total
       if (dayWorkMinutes > 480) {
         suggestions.push({
           type: 'work_balance',
-          message: 'Considere distribuir melhor as atividades para evitar sobrecarga'
-        });
-      }
-
-      if (!dayActivities.some(a => this.isBreakActivity(a))) {
-        suggestions.push({
-          type: 'meal_time',
-          message: 'Incluir pausas regulares ajuda a manter sua energia ao longo do dia'
+          message: 'Que tal distribuir melhor as atividades para evitar sobrecarga? 💪'
         });
       }
     });
@@ -262,17 +353,7 @@ class ReminderService {
         return;
       }
 
-      const messages = {
-        before: `⏰ Em 5 minutos: ${activity.activity}`,
-        start: `🎯 Hora de iniciar: ${activity.activity}`,
-        followUp: `✅ Hora de finalizar: ${activity.activity}`
-      };
-
-      if (this.isBreakActivity(activity)) {
-        messages.before = `⏰ Em 5 minutos é hora da sua pausa`;
-        messages.start = `🧘‍♂️ Momento de descansar um pouco`;
-        messages.followUp = `✅ Fim da pausa. Pronto para continuar?`;
-      }
+      const messages = this.getActivityMessages(activity, timing);
 
       await evolutionApi.sendText(user.whatsappNumber, messages[timing]);
       this.lastSentReminders.set(lastSentKey, now);
@@ -283,27 +364,95 @@ class ReminderService {
     }
   }
 
+  getActivityMessages(activity, timing) {
+    const [hours] = activity.scheduledTime.split(':').map(Number);
+    const period = hours < 12 ? 'manhã' : hours < 18 ? 'tarde' : 'noite';
+    
+    const periodEmojis = {
+      'manhã': '🌅',
+      'tarde': '☀️',
+      'noite': '🌙'
+    };
+
+    const motivationalMessages = {
+      'manhã': [
+        'Comece o dia com energia! ⚡',
+        'Um ótimo dia pela frente! 🌟',
+        'Hora de começar com tudo! 💪'
+      ],
+      'tarde': [
+        'Mantenha o foco! 🎯',
+        'Continue com energia! ⚡',
+        'Você está indo bem! 💫'
+      ],
+      'noite': [
+        'Última etapa do dia! 🌙',
+        'Finalizando com sucesso! ✨',
+        'Quase lá! 💫'
+      ]
+    };
+
+    const randomMotivation = () => {
+      const messages = motivationalMessages[period];
+      return messages[Math.floor(Math.random() * messages.length)];
+    };
+
+    if (this.isBreakActivity(activity)) {
+      return {
+        before: `${periodEmojis[period]} Em 5 minutos é hora da sua pausa! Prepare-se para recarregar as energias`,
+        start: `🧘‍♂️ Momento de descansar! Aproveite para se alongar e respirar`,
+        followUp: `✨ Pausa concluída! ${randomMotivation()}`
+      };
+    }
+
+    return {
+      before: `${periodEmojis[period]} Em 5 minutos: ${activity.activity}\n${randomMotivation()}`,
+      start: `🎯 Hora de iniciar: ${activity.activity}\nFoco total nessa atividade! 💪`,
+      followUp: `✅ Hora de finalizar: ${activity.activity}\nÓtimo trabalho! 🌟`
+    };
+  }
+
   async askActivityCompletion(user, activity) {
     try {
       if (!this.isBreakActivity(activity)) {
+        const [hours] = activity.scheduledTime.split(':').map(Number);
+        const period = hours < 12 ? 'manhã' : hours < 18 ? 'tarde' : 'noite';
+        
+        const feedbackMessages = {
+          'manhã': 'Como começou sua manhã?',
+          'tarde': 'Como está indo seu dia?',
+          'noite': 'Como foi essa atividade?'
+        };
+
         await evolutionApi.sendList(
           user.whatsappNumber,
-          'Como foi a atividade?',
+          feedbackMessages[period],
           `"${activity.activity}"\n\n` +
-          `_Seu feedback ajuda a melhorar suas sugestões!_ ✨`,
+          `_Seu feedback ajuda a personalizar suas sugestões!_ ✨\n` +
+          `_Juntos podemos melhorar sua produtividade!_ 💪`,
           'Responder',
           [{
             title: 'Status',
             rows: [
               {
-                title: '✅ Completei!',
-                description: 'Tudo certo',
+                title: '✅ Completei com sucesso!',
+                description: 'Tudo conforme planejado',
                 rowId: `completed_${activity._id}`
+              },
+              {
+                title: '👍 Completei parcialmente',
+                description: 'Fiz o que foi possível',
+                rowId: `partial_${activity._id}`
               },
               {
                 title: '⚙️ Preciso ajustar',
                 description: 'Modificar horário/duração',
                 rowId: `adjust_${activity._id}`
+              },
+              {
+                title: '💡 Tenho uma sugestão',
+                description: 'Melhorar a atividade',
+                rowId: `suggest_${activity._id}`
               }
             ]
           }]

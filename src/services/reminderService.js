@@ -37,17 +37,16 @@ class ReminderService {
       // Configurar lembretes diários para cada atividade
       console.log('Configurando lembretes diários para:', user.name);
       routine.activities.forEach(activity => {
-        // Convert activity time to user's timezone
-        const userTime = new Date();
+        // Parse activity time
         const [hours, minutes] = activity.scheduledTime.split(':').map(Number);
+        
+        // Create a date in America/Sao_Paulo timezone
+        const userTime = new Date();
         userTime.setHours(hours, minutes, 0, 0);
 
-        // Adjust for timezone (America/Sao_Paulo)
-        const timezonedDate = new Date(userTime.toLocaleString('en-US', {
-          timeZone: 'America/Sao_Paulo'
-        }));
-        const tzHours = timezonedDate.getHours();
-        const tzMinutes = timezonedDate.getMinutes();
+        // Get hours and minutes directly (no timezone conversion needed as we're already in Sao Paulo time)
+        const tzHours = hours;
+        const tzMinutes = minutes;
         
         // Before reminder (5 minutes before)
         const beforeTime = this.adjustTime(tzHours, tzMinutes, -5);
@@ -61,20 +60,19 @@ class ReminderService {
         const followUpExpression = `${followUpTime.minutes} ${followUpTime.hours} * * *`;
 
         // Log the scheduled times for debugging
-        console.log('Reminder times for activity:', activity.activity, {
-          beforeTime: `${beforeTime.hours}:${beforeTime.minutes}`,
-          startTime: `${tzHours}:${tzMinutes}`,
-          followUpTime: `${followUpTime.hours}:${followUpTime.minutes}`
+        console.log(`Configurando lembretes para: ${activity.activity} (${activity.scheduledTime})`, {
+          'Horário original': activity.scheduledTime,
+          'Lembrete antes': `${beforeTime.hours}:${String(beforeTime.minutes).padStart(2, '0')}`,
+          'Início': `${tzHours}:${String(tzMinutes).padStart(2, '0')}`,
+          'Acompanhamento': `${followUpTime.hours}:${String(followUpTime.minutes).padStart(2, '0')}`
         });
 
-        console.log('Setting up reminders for activity:', {
-          activity: activity.activity,
-          scheduledTime: activity.scheduledTime,
-          expressions: {
-            before: beforeExpression,
-            start: startExpression,
-            followUp: followUpExpression
-          }
+        // Log cron expressions for verification
+        console.log('Expressões cron:', {
+          'Atividade': activity.activity,
+          'Antes': `${beforeExpression} (${beforeTime.hours}:${String(beforeTime.minutes).padStart(2, '0')})`,
+          'Início': `${startExpression} (${tzHours}:${String(tzMinutes).padStart(2, '0')})`,
+          'Acompanhamento': `${followUpExpression} (${followUpTime.hours}:${String(followUpTime.minutes).padStart(2, '0')})`
         });
         
         // Create cron jobs

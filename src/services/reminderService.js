@@ -16,70 +16,89 @@ class ReminderService {
     }
   }
 
-  async setupReminders(user, routine) {
+  setupActivityReminders(activity) {
+    // Parse activity time and calculate reminders
+    const [hours, minutes] = activity.scheduledTime.split(':').map(Number);
+    const beforeTime = this.adjustTime(hours, minutes, -5);
+    const followUpTime = this.adjustTime(hours, minutes, activity.duration);
+    
+    // Determine os dias da semana para esta atividade
+    const days = activity.schedule?.days || ['*']; // '*' significa todos os dias
+    const daysExpression = days[0] === '*' ? '*' : days.join(',');
+    
+    // Create cron expressions
+    const beforeExpression = `${beforeTime.minutes} ${beforeTime.hours} * * ${daysExpression}`;
+    const startExpression = `${minutes} ${hours} * * ${daysExpression}`;
+    const followUpExpression = `${followUpTime.minutes} ${followUpTime.hours} * * ${daysExpression}`;
+    
+    // Log detalhado da configuração
+    console.log(`⏰ Atividade: ${activity.activity}`, {
+      'Agenda': {
+        'Dias': days[0] === '*' ? 'Todos os dias' : days.join(', '),
+        'Horário': `${this.formatTime(hours, minutes)} (${activity.duration}min)`
+      },
+      'Lembretes': {
+        'Preparação': `${this.formatTime(beforeTime.hours, beforeTime.minutes)}`,
+        'Início': `${this.formatTime(hours, minutes)}`,
+        'Conclusão': `${this.formatTime(followUpTime.hours, followUpTime.minutes)}`
+      }
+    });
+
+    return {
+      times: { beforeTime, hours, minutes, followUpTime },
+      expressions: { beforeExpression, startExpression, followUpExpression }
+    };
+  }
+
+  async setupReminders(user, routine, isUpdate = false) {
     try {
-      // Cancel existing reminders for this user
-      this.cancelUserReminders(user.id);
-
-      // Enviar mensagem explicativa sobre os lembretes
-      await evolutionApi.sendText(
-        user.whatsappNumber,
-        `*Seus lembretes foram configurados!* ⏰\n\n` +
-        `Para cada atividade do seu dia, você receberá:\n` +
-        `• Um lembrete 5 minutos antes para se preparar\n` +
-        `• Uma notificação no horário de início\n` +
-        `• Um acompanhamento ao finalizar\n\n` +
-        `Por exemplo, para uma atividade às ${this.formatTime(9, 0)}:\n` +
-        `• ${this.formatTime(8, 55)} - Preparação\n` +
-        `• ${this.formatTime(9, 0)} - Início\n` +
-        `• ${this.formatTime(9, 30)} - Acompanhamento (após 30min)\n\n` +
-        `_Estes lembretes se repetirão todos os dias nos mesmos horários_ 🔄\n` +
-        `_Para ajustar os horários, basta me avisar!_ 💪`
-      );
-
-      const reminders = [];
+      // Get existing reminders before canceling
+      const existingReminders = this.activeReminders.get(user.id) || [];
       
-      // Configurar lembretes diários para cada atividade
-      console.log('Configurando lembretes diários para:', user.name);
+      if (isUpdate) {
+        // Cancel only specific reminders if updating
+        routine.activities.forEach(activity => {
+          const existingActivity = existingReminders.find(r => 
+            r.activityId.toString() === activity._id.toString()
+          );
+          if (existingActivity) {
+            existingActivity.job.stop();
+          }
+        });
+      } else {
+        // Cancel all reminders for new setup
+        this.cancelUserReminders(user.id);
+        
+        // Send setup message only for new setups
+        await evolutionApi.sendText(
+          user.whatsappNumber,
+          `*Seus lembretes foram configurados!* ⏰\n\n` +
+          `Para cada atividade do seu dia, você receberá:\n` +
+          `• Um lembrete 5 minutos antes para se preparar\n` +
+          `• Uma notificação no horário de início\n` +
+          `• Um acompanhamento ao finalizar\n\n` +
+          `Por exemplo, para uma atividade às ${this.formatTime(9, 0)}:\n` +
+          `• ${this.formatTime(8, 55)} - Preparação\n` +
+          `• ${this.formatTime(9, 0)} - Início\n` +
+          `• ${this.formatTime(9, 30)} - Acompanhamento (após 30min)\n\n` +
+          `_Os lembretes respeitarão sua agenda de cada dia_ 🔄\n` +
+          `_Para ajustar os horários, basta me avisar!_ 💪`
+        );
+      }
+
+      // Combine existing and new reminders
+      let reminders = isUpdate ? 
+        existingReminders.filter(r => !routine.activities.find(a => 
+          a._id.toString() === r.activityId.toString()
+        )) : [];
+      
+      // Configure reminders for each activity
+      console.log(`📅 Iniciando configuração de lembretes para: ${user.name}`);
       routine.activities.forEach(activity => {
-        // Parse activity time
-        const [hours, minutes] = activity.scheduledTime.split(':').map(Number);
-        
-        // Create a date in America/Sao_Paulo timezone
-        const userTime = new Date();
-        userTime.setHours(hours, minutes, 0, 0);
+        const { times, expressions } = this.setupActivityReminders(activity);
+        const { beforeTime, hours, minutes, followUpTime } = times;
+        const { beforeExpression, startExpression, followUpExpression } = expressions;
 
-        // Get hours and minutes directly (no timezone conversion needed as we're already in Sao Paulo time)
-        const tzHours = hours;
-        const tzMinutes = minutes;
-        
-        // Before reminder (5 minutes before)
-        const beforeTime = this.adjustTime(tzHours, tzMinutes, -5);
-        const beforeExpression = `${beforeTime.minutes} ${beforeTime.hours} * * *`;
-        
-        // Start reminder (at scheduled time)
-        const startExpression = `${tzMinutes} ${tzHours} * * *`;
-        
-        // Follow-up reminder (at end of duration)
-        const followUpTime = this.adjustTime(tzHours, tzMinutes, activity.duration);
-        const followUpExpression = `${followUpTime.minutes} ${followUpTime.hours} * * *`;
-
-        // Log the scheduled times for debugging
-        console.log(`Configurando lembretes para: ${activity.activity} (${activity.scheduledTime})`, {
-          'Horário original': activity.scheduledTime,
-          'Lembrete antes': this.formatTime(beforeTime.hours, beforeTime.minutes),
-          'Início': this.formatTime(tzHours, tzMinutes),
-          'Acompanhamento': this.formatTime(followUpTime.hours, followUpTime.minutes)
-        });
-
-        // Log cron expressions for verification
-        console.log('Expressões cron:', {
-          'Atividade': activity.activity,
-          'Antes': `${beforeExpression} (${this.formatTime(beforeTime.hours, beforeTime.minutes)})`,
-          'Início': `${startExpression} (${this.formatTime(tzHours, tzMinutes)})`,
-          'Acompanhamento': `${followUpExpression} (${this.formatTime(followUpTime.hours, followUpTime.minutes)})`
-        });
-        
         // Create cron jobs
         const beforeJob = cron.schedule(beforeExpression, async () => {
           await this.sendActivityReminder(user, activity, 'before');

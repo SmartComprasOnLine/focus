@@ -339,6 +339,9 @@ class ReminderService {
   validatePlan(activities) {
     const errors = [];
     const warnings = [];
+    let totalWorkMinutes = 0;
+    let lastBreakTime = null;
+    let continuousWorkMinutes = 0;
 
     activities.forEach((activity, index) => {
       // Validar formato de horário
@@ -356,7 +359,34 @@ class ReminderService {
         const prevActivity = activities[index - 1];
         const prevEnd = this.addMinutes(prevActivity.scheduledTime, prevActivity.duration);
         if (this.isTimeBefore(activity.scheduledTime, prevEnd)) {
-          warnings.push(`Possível sobreposição entre "${prevActivity.activity}" e "${activity.activity}"`);
+          errors.push(`Sobreposição entre "${prevActivity.activity}" e "${activity.activity}"`);
+        }
+      }
+
+      // Calcular tempo total de trabalho
+      if (!activity.activity.toLowerCase().includes('pausa') && 
+          !activity.activity.toLowerCase().includes('almoço') &&
+          !activity.activity.toLowerCase().includes('descanso')) {
+        totalWorkMinutes += activity.duration;
+        continuousWorkMinutes += activity.duration;
+      } else {
+        // Resetar contagem de trabalho contínuo em pausas
+        if (activity.duration >= 15) {
+          continuousWorkMinutes = 0;
+          lastBreakTime = activity.scheduledTime;
+        }
+      }
+
+      // Validar tempo contínuo de trabalho
+      if (continuousWorkMinutes > 240) { // 4 horas
+        warnings.push(`Período longo sem pausa adequada após "${activity.activity}"`);
+      }
+
+      // Validar intervalo entre pausas
+      if (lastBreakTime && activity.activity.toLowerCase().includes('trabalho')) {
+        const timeSinceBreak = this.getMinutesBetween(lastBreakTime, activity.scheduledTime);
+        if (timeSinceBreak > 240) { // 4 horas
+          warnings.push(`Muito tempo sem pausa antes de "${activity.activity}"`);
         }
       }
 
@@ -370,6 +400,20 @@ class ReminderService {
         }
       }
     });
+
+    // Validar tempo total de trabalho
+    if (totalWorkMinutes > 600) { // 10 horas
+      warnings.push(`Tempo total de trabalho muito longo: ${Math.round(totalWorkMinutes/60)}h${totalWorkMinutes%60}min`);
+    }
+
+    // Verificar pausa para almoço
+    const hasLunch = activities.some(a => 
+      a.activity.toLowerCase().includes('almoço') && 
+      a.duration >= 30
+    );
+    if (!hasLunch) {
+      warnings.push('Não foi encontrada pausa adequada para almoço (mínimo 30min)');
+    }
 
     return { errors, warnings };
   }

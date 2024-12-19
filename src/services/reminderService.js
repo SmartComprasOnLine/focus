@@ -19,28 +19,37 @@ class ReminderService {
   setupActivityReminders(activity) {
     // Parse activity time and calculate reminders
     const [hours, minutes] = activity.scheduledTime.split(':').map(Number);
-    const beforeTime = this.adjustTime(hours, minutes, -5);
-    const followUpTime = this.adjustTime(hours, minutes, activity.duration);
     
     // Determine os dias da semana para esta atividade
     const days = activity.schedule?.days || ['*']; // '*' significa todos os dias
     const daysExpression = days[0] === '*' ? '*' : days.join(',');
     
-    // Create cron expressions
+    // Ajusta horários para timezone America/Sao_Paulo
+    const spTimezone = 'America/Sao_Paulo';
+    const now = new Date();
+    const userTime = new Date(now.toLocaleString('en-US', { timeZone: spTimezone }));
+    userTime.setHours(hours, minutes, 0, 0);
+    
+    // Calcula horários dos lembretes
+    const beforeTime = this.adjustTime(hours, minutes, -5);
+    const followUpTime = this.adjustTime(hours, minutes, activity.duration);
+    
+    // Cria expressões cron
     const beforeExpression = `${beforeTime.minutes} ${beforeTime.hours} * * ${daysExpression}`;
     const startExpression = `${minutes} ${hours} * * ${daysExpression}`;
     const followUpExpression = `${followUpTime.minutes} ${followUpTime.hours} * * ${daysExpression}`;
-    
-    // Log detalhado da configuração
-    console.log(`⏰ Atividade: ${activity.activity}`, {
+
+    // Log unificado e detalhado
+    console.log(`⏰ Configurando lembretes para: ${activity.activity}`, {
       'Agenda': {
         'Dias': days[0] === '*' ? 'Todos os dias' : days.join(', '),
-        'Horário': `${this.formatTime(hours, minutes)} (${activity.duration}min)`
+        'Horário': `${this.formatTime(hours, minutes)} (${activity.duration}min)`,
+        'Timezone': spTimezone
       },
       'Lembretes': {
-        'Preparação': `${this.formatTime(beforeTime.hours, beforeTime.minutes)}`,
-        'Início': `${this.formatTime(hours, minutes)}`,
-        'Conclusão': `${this.formatTime(followUpTime.hours, followUpTime.minutes)}`
+        'Preparação': `${this.formatTime(beforeTime.hours, beforeTime.minutes)} (${beforeExpression})`,
+        'Início': `${this.formatTime(hours, minutes)} (${startExpression})`,
+        'Conclusão': `${this.formatTime(followUpTime.hours, followUpTime.minutes)} (${followUpExpression})`
       }
     });
 
@@ -132,12 +141,27 @@ class ReminderService {
   }
 
   adjustTime(hours, minutes, adjustment) {
-    // Ensure positive values for modulo operation
-    const totalMinutes = (hours * 60 + minutes + adjustment + 1440) % 1440;
+    // Convert to Date object for proper timezone handling
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    
+    // Add adjustment in minutes
+    date.setMinutes(date.getMinutes() + adjustment);
+    
+    // Get time in America/Sao_Paulo timezone
+    const spTime = date.toLocaleString('en-US', { 
+      timeZone: 'America/Sao_Paulo',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    // Parse hours and minutes
+    const [adjustedHours, adjustedMinutes] = spTime.split(':').map(Number);
     
     return {
-      hours: Math.floor(totalMinutes / 60),
-      minutes: Math.floor(totalMinutes % 60)
+      hours: adjustedHours,
+      minutes: adjustedMinutes
     };
   }
 
@@ -172,8 +196,23 @@ class ReminderService {
         const defaultMessages = {
           before: `⏰ Prepare-se! Em 5 minutos começa: ${activity.activity}`,
           start: `🎯 Hora de iniciar: ${activity.activity}`,
-          followUp: `✅ Hora de finalizar: ${activity.activity}\n_Como foi a atividade?_`
+          followUp: activity.activity.toLowerCase().includes('sono') || activity.activity.toLowerCase().includes('dormir') ?
+            `✅ Hora de finalizar: ${activity.activity}\nBom descanso! 😴` :
+            `✅ Hora de finalizar: ${activity.activity}\n_Como foi a atividade?_`
         };
+
+        // Ajusta mensagem baseado no tipo de atividade
+        if (activity.activity.toLowerCase().includes('expediente') || 
+            activity.activity.toLowerCase().includes('trabalho')) {
+          defaultMessages.before = `⏰ Em 5 minutos inicia seu ${activity.activity}`;
+          defaultMessages.start = `🎯 Momento de focar no ${activity.activity}`;
+          defaultMessages.followUp = `✅ Hora de concluir ${activity.activity}\n_Como foi sua produtividade?_`;
+        } else if (activity.activity.toLowerCase().includes('pausa') || 
+                   activity.activity.toLowerCase().includes('descanso')) {
+          defaultMessages.before = `⏰ Em 5 minutos é hora da sua ${activity.activity}`;
+          defaultMessages.start = `🧘‍♂️ Momento de sua ${activity.activity}`;
+          defaultMessages.followUp = `✅ Fim da ${activity.activity}\n_Está mais renovado?_`;
+        }
         message = defaultMessages[timing];
       }
       

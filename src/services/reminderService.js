@@ -25,11 +25,16 @@ class ReminderService {
       await evolutionApi.sendText(
         user.whatsappNumber,
         `*Seus lembretes foram configurados!* ⏰\n\n` +
-        `Você receberá 3 lembretes diários para cada atividade:\n` +
-        `• 5 minutos antes do início\n` +
-        `• No horário marcado\n` +
-        `• Ao finalizar a atividade\n\n` +
-        `_Vou te ajudar a manter o foco e acompanhar seu progresso diário!_ 💪`
+        `Para cada atividade do seu dia, você receberá:\n` +
+        `• Um lembrete 5 minutos antes para se preparar\n` +
+        `• Uma notificação no horário de início\n` +
+        `• Um acompanhamento ao finalizar\n\n` +
+        `Por exemplo, para uma atividade às ${this.formatTime(9, 0)}:\n` +
+        `• ${this.formatTime(8, 55)} - Preparação\n` +
+        `• ${this.formatTime(9, 0)} - Início\n` +
+        `• ${this.formatTime(9, 30)} - Acompanhamento (após 30min)\n\n` +
+        `_Estes lembretes se repetirão todos os dias nos mesmos horários_ 🔄\n` +
+        `_Para ajustar os horários, basta me avisar!_ 💪`
       );
 
       const reminders = [];

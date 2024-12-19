@@ -16,6 +16,9 @@ class OpenAIService {
                 historyLength: messageHistory.length
             });
 
+            // Extrai informações do contexto anterior
+            const contextInfo = this.extractContextInfo(messageHistory);
+            
             // Verifica se é a primeira mensagem (sem histórico)
             const isFirstMessage = messageHistory.length === 1;
 
@@ -28,6 +31,17 @@ class OpenAIService {
                 if (hour >= 12 && hour < 18) return 'Boa tarde';
                 return 'Boa noite';
             })();
+
+            // Prepara o contexto para o prompt
+            const context = contextInfo ? 
+                `Contexto atual do usuário:
+                - Nome: ${name}
+                - Rotina de trabalho: ${contextInfo.workSchedule || 'Não informado'}
+                - Situação familiar: ${contextInfo.familyContext || 'Não informado'}
+                - Desafios: ${contextInfo.challenges || 'Não informados'}
+                - Plano atual: ${contextInfo.currentPlan || 'Não possui'}
+                - Última interação: ${contextInfo.lastInteraction || 'Primeira interação'}` 
+                : '';
 
             const systemPrompt = isFirstMessage
                 ? `Você é Rita, uma assistente pessoal especializada em produtividade, gestão de tempo e bem estar. 
@@ -52,7 +66,16 @@ class OpenAIService {
                 Horário atual: ${currentTime}
                 Data atual: ${currentDate}
                 Dia da semana: ${currentDay}
+
+                ${context}
                 
+                Regras importantes:
+                1. SEMPRE mantenha consistência com o contexto anterior
+                2. Se existir um plano, faça apenas os ajustes solicitados
+                3. Considere a situação familiar e desafios nas sugestões
+                4. Mantenha o tom empático e compreensivo
+                5. Priorize equilíbrio entre trabalho e vida pessoal
+
                 Mantenha suas respostas:
                 • Curtas e objetivas
                 • Focadas em organização e rotina
@@ -106,6 +129,51 @@ class OpenAIService {
         }
     }
 
+    extractContextInfo(messageHistory) {
+        if (!messageHistory || messageHistory.length === 0) return null;
+
+        const context = {
+            workSchedule: '',
+            familyContext: '',
+            challenges: '',
+            currentPlan: '',
+            lastInteraction: ''
+        };
+
+        // Analisa o histórico de mensagens para extrair informações
+        messageHistory.forEach(msg => {
+            const content = msg.content.toLowerCase();
+            
+            // Extrai horário de trabalho
+            if (content.includes('trabalho') && content.includes('até')) {
+                const workMatch = content.match(/trabalho d[ae]s? (\d{1,2})\s?(?::|h|hrs?)?\s?(?:ate|até)\s?(\d{1,2})/);
+                if (workMatch) {
+                    context.workSchedule = `${workMatch[1]}h às ${workMatch[2]}h`;
+                }
+            }
+
+            // Extrai contexto familiar
+            if (content.includes('filhos') || content.includes('esposa') || content.includes('família')) {
+                context.familyContext = msg.content;
+            }
+
+            // Extrai desafios
+            if (content.includes('cansado') || content.includes('difícil') || content.includes('problema')) {
+                context.challenges = msg.content;
+            }
+
+            // Extrai plano atual se existir
+            if (content.includes('plano personalizado') || content.includes('análise da sua rotina')) {
+                context.currentPlan = msg.content;
+            }
+        });
+
+        // Guarda a última interação
+        context.lastInteraction = messageHistory[messageHistory.length - 1].content;
+
+        return context;
+    }
+
     async generateInitialPlan(name, message, messageHistory = []) {
         try {
             console.log('Gerando plano inicial para:', {
@@ -113,6 +181,26 @@ class OpenAIService {
                 message,
                 historyLength: messageHistory.length
             });
+
+            // Extrai informações do contexto
+            const contextInfo = this.extractContextInfo(messageHistory);
+
+            // Prepara o contexto para o prompt
+            const context = contextInfo ? 
+                `Contexto atual do usuário:
+                - Nome: ${name}
+                - Rotina de trabalho: ${contextInfo.workSchedule || 'Não informado'}
+                - Situação familiar: ${contextInfo.familyContext || 'Não informado'}
+                - Desafios: ${contextInfo.challenges || 'Não informados'}
+                - Plano atual: ${contextInfo.currentPlan || 'Não possui'}
+                - Última interação: ${contextInfo.lastInteraction || 'Primeira interação'}
+
+                IMPORTANTE:
+                1. Se já existe um plano, mantenha-o e faça apenas os ajustes necessários
+                2. Considere o contexto familiar e desafios ao criar/ajustar o plano
+                3. Priorize o equilíbrio entre trabalho e vida pessoal
+                4. Mantenha consistência com as interações anteriores` 
+                : '';
 
             const response = await this.openai.chat.completions.create({
                 model: process.env.OPENAI_MODEL,
@@ -123,6 +211,8 @@ class OpenAIService {
 Horário atual: ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
 Data atual: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
 Dia da semana: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' })}
+
+${context}
 
 ${messageHistory.length > 0 ? 
 `Atualize o plano existente mantendo a mesma estrutura e fazendo apenas as alterações solicitadas.
@@ -137,7 +227,10 @@ Importante:
 1. Mantenha as atividades que não foram mencionadas nas mudanças
 2. Atualize apenas os horários e durações solicitados
 3. Ajuste os horários subsequentes conforme necessário
-4. Mantenha a mesma estrutura e formato do plano` 
+4. Mantenha a mesma estrutura e formato do plano
+5. Considere o contexto familiar e desafios do usuário
+6. Priorize o equilíbrio entre trabalho e vida pessoal
+7. Inclua momentos de descanso e tempo com a família` 
 :
 `Analise a rotina do usuário considerando:`}
 - Horários de trabalho fixos (PRIORIDADE MÁXIMA)

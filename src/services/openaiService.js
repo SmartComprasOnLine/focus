@@ -8,78 +8,6 @@ class OpenAIService {
         });
     }
 
-    async detectIntent(message, userContext = {}) {
-        try {
-            // Check for direct commands first
-            const lowerMessage = message.toLowerCase().trim();
-            
-            // Data deletion commands
-            const deleteCommands = [
-                'apagar', 'deletar', 'excluir', 'remover',
-                'apagar dados', 'deletar dados', 'excluir dados', 'remover dados',
-                'apagar meus dados', 'deletar meus dados', 'excluir meus dados', 'remover meus dados'
-            ];
-            if (deleteCommands.some(cmd => lowerMessage.includes(cmd))) {
-                return 'delete_data';
-            }
-
-            // Confirmation commands
-            const confirmCommands = ['sim', 'ótimo', 'ok', 'beleza', 'confirmar', 'pode ser', 'claro'];
-            if (confirmCommands.some(cmd => lowerMessage === cmd)) {
-                return 'confirm_plan';
-            }
-
-            // Time queries
-            if (lowerMessage.includes('que horas') || 
-                lowerMessage.includes('horário') || 
-                lowerMessage.includes('hora atual')) {
-                return 'time_query';
-            }
-
-            const response = await this.openai.chat.completions.create({
-                model: process.env.OPENAI_MODEL,
-                messages: [
-                    {
-                        role: "system",
-                        content: `Analise a mensagem e contexto do usuário para identificar a intenção.
-                        
-Considere:
-- Histórico de mensagens
-- Padrões de comportamento
-- Horário do dia
-- Estado atual do plano
-
-Retorne apenas uma das intenções:
-- initial_message: primeira interação ou saudação
-- create_plan: criar plano inicial
-- update_plan: modificar plano existente
-- show_plan: ver plano atual
-- activity_completed: completou atividade
-- activity_not_completed: não completou atividade
-- subscription_inquiry: pergunta sobre planos
-- select_plan: escolha de plano
-- goodbye: despedida
-- general_conversation: outros`
-                    },
-                    {
-                        role: "user",
-                        content: JSON.stringify({
-                            message,
-                            context: userContext
-                        })
-                    }
-                ],
-                temperature: 0.3,
-                max_tokens: 50
-            });
-
-            return response.choices[0].message.content.trim().toLowerCase();
-        } catch (error) {
-            console.error('Erro ao detectar intenção:', error);
-            throw error;
-        }
-    }
-
     async generateResponse(name, message, messageHistory = []) {
         try {
             console.log('Gerando resposta para:', {
@@ -87,6 +15,9 @@ Retorne apenas uma das intenções:
                 message,
                 historyLength: messageHistory.length
             });
+
+            // Verifica se é a primeira mensagem (sem histórico)
+            const isFirstMessage = messageHistory.length === 1;
 
             const currentTime = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
             const currentDate = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -98,8 +29,8 @@ Retorne apenas uma das intenções:
                 return 'Boa noite';
             })();
 
-            const systemPrompt = messageHistory.length === 0
-                ? `Você é Rita, uma assistente pessoal especializada em produtividade. 
+            const systemPrompt = isFirstMessage
+                ? `Você é Rita, uma assistente pessoal especializada em produtividade, gestão de tempo e bem estar. 
                 Horário atual: ${currentTime}
                 Data atual: ${currentDate}
                 Dia da semana: ${currentDay}
@@ -117,23 +48,41 @@ Retorne apenas uma das intenções:
                 • Manter o equilíbrio entre tarefas e bem estar ✨
 
                 Você tem *7 dias gratuitos* para experimentar. Quer começar criando seu plano personalizado? Me conte um pouco sobre sua rotina! 💪"`
-                : `Você é Rita, uma assistente pessoal especializada em produtividade. 
+                : `Você é Rita, uma assistente pessoal especializada em produtividade, gestão de tempo e bem estar.
                 Horário atual: ${currentTime}
                 Data atual: ${currentDate}
                 Dia da semana: ${currentDay}
-
-                Analise o histórico e contexto para gerar uma resposta personalizada.
                 
                 Mantenha suas respostas:
-                • Curtas e objetivas (2-3 linhas)
-                • Focadas em produtividade
-                • Com sugestões práticas
-                • Usando emojis relevantes
-                • Direcionando para o plano
+                • Curtas e objetivas
+                • Focadas em organização e rotina
+                • Com no máximo 2-3 linhas
+                • Sempre direcionando para criar ou ajustar o plano
+                • Considere o horário atual nas sugestões
+                
+                Se o usuário perguntar sobre horário, responda:
+                "São *${currentTime}* (horário de Brasília). Posso te ajudar a organizar melhor seu tempo criando um plano personalizado! 😊"
 
-                Se precisar de mais informações, faça perguntas específicas.
-                Se detectar padrões, sugira melhorias.
-                Se houver desafios, ofereça soluções práticas.`;
+                Se o usuário perguntar o que você faz, responda:
+                "Sou especializada em:
+                • Criar planos diários produtivos e equilibrados ⏰
+                • Gerenciar seu tempo com lembretes inteligentes 📱
+                • Acompanhar seu progresso e bem estar ✨
+
+                Quer começar criando seu plano? 😊"`;
+
+            // Check if user is asking for time
+            if (message.toLowerCase().includes('que horas') || 
+                message.toLowerCase().includes('horário') || 
+                message.toLowerCase().includes('hora atual')) {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('pt-BR', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    timeZone: 'America/Sao_Paulo'
+                });
+                return `São *${timeStr}* (horário de Brasília). Posso te ajudar a organizar melhor seu tempo criando um plano personalizado! 😊`;
+            }
 
             const response = await this.openai.chat.completions.create({
                 model: process.env.OPENAI_MODEL,
@@ -145,7 +94,7 @@ Retorne apenas uma das intenções:
                 temperature: 0.7
             });
 
-            console.log('Resposta gerada:', {
+            console.log('Resposta da OpenAI:', {
                 status: 'sucesso',
                 content: response.choices[0].message.content
             });
@@ -191,6 +140,7 @@ Importante:
 4. Mantenha a mesma estrutura e formato do plano` 
 :
 `Analise a rotina do usuário considerando:`}
+- Horários de trabalho fixos (PRIORIDADE MÁXIMA)
 - Ciclo de energia (disposição, descanso)
 - Gestão de tempo (foco, pausas)
 - Hábitos e rotinas
@@ -198,9 +148,25 @@ Importante:
 - Bem-estar (equilíbrio, exercícios)
 - Horário atual e dia da semana
 
-Regras para duração das atividades:
+Regras OBRIGATÓRIAS para horários de trabalho:
+1. Horários de trabalho são FIXOS e IMUTÁVEIS
+2. NUNCA agende outras atividades durante horário de trabalho
+3. Identifique horários de trabalho por palavras-chave como:
+   - "trabalho das X às Y"
+   - "trabalho pela manhã/tarde"
+   - "expediente"
+   - "horário comercial"
+4. Se houver conflito, SEMPRE priorize o horário de trabalho
+5. Agende outras atividades nos intervalos disponíveis
 
-1. Trabalho/Estudo:
+Regras OBRIGATÓRIAS para duração das atividades:
+
+1. Trabalho (PRIORIDADE MÁXIMA):
+   - Respeitar EXATAMENTE os horários informados
+   - Não fragmentar períodos de trabalho
+   - Incluir apenas pausas permitidas
+   
+2. Estudo:
    - Blocos focados: 90-120 minutos
    - Pausas curtas: 5-15 minutos entre blocos
    - Pausa longa: 30-60 minutos após 4 horas
@@ -220,12 +186,14 @@ Regras para duração das atividades:
    - Soneca pós-almoço: máx 30-40 minutos
    - Pausas para relaxamento: 10-15 minutos
    - Preparação para dormir: 30-45 minutos
-   - Sono noturno: 7-8 horas
+   - Sono noturno: 7-8 horas 420-480 minutos
 
 5. Organização do dia:
    - Manhã: atividades que exigem mais foco
    - Tarde: alternar trabalho com pausas
    - Noite: atividades leves após 20:00
+
+Defina a duração de cada atividade de acordo com estas regras e a rotina do usuário.
 
 Retorne apenas um JSON válido neste formato:
 {
@@ -363,36 +331,6 @@ Retorne apenas um JSON válido neste formato:
             return plan;
         } catch (error) {
             console.error('Erro ao gerar plano inicial:', error);
-            throw error;
-        }
-    }
-
-    async extractActivityInfo(message) {
-        try {
-            const response = await this.openai.chat.completions.create({
-                model: process.env.OPENAI_MODEL,
-                messages: [
-                    {
-                        role: "system",
-                        content: `Analise a mensagem e extraia:
-- ID da atividade (formato: completed_ID ou not_completed_ID)
-- Tipo de plano (mensal ou anual)
-- Detalhes da atividade (horário, tarefa, duração)
-
-Retorne apenas um JSON válido com as informações encontradas, ou null se não houver informações relevantes.`
-                    },
-                    {
-                        role: "user",
-                        content: message
-                    }
-                ],
-                temperature: 0.3,
-                response_format: { type: "json_object" }
-            });
-
-            return JSON.parse(response.choices[0].message.content);
-        } catch (error) {
-            console.error('Erro ao extrair informações:', error);
             throw error;
         }
     }

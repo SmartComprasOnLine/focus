@@ -21,9 +21,21 @@ class ReminderService {
       // Cancel existing reminders for this user
       this.cancelUserReminders(user.id);
 
+      // Enviar mensagem explicativa sobre os lembretes
+      await evolutionApi.sendText(
+        user.whatsappNumber,
+        `*Seus lembretes foram configurados!* ⏰\n\n` +
+        `Você receberá 3 lembretes diários para cada atividade:\n` +
+        `• 5 minutos antes do início\n` +
+        `• No horário marcado\n` +
+        `• Ao finalizar a atividade\n\n` +
+        `_Vou te ajudar a manter o foco e acompanhar seu progresso diário!_ 💪`
+      );
+
       const reminders = [];
       
-      // Set up reminders for each activity in the plan
+      // Configurar lembretes diários para cada atividade
+      console.log('Configurando lembretes diários para:', user.name);
       routine.activities.forEach(activity => {
         // Convert activity time to user's timezone
         const userTime = new Date();
@@ -44,24 +56,14 @@ class ReminderService {
         // Start reminder (at scheduled time)
         const startExpression = `${tzMinutes} ${tzHours} * * *`;
         
-        // During reminder (15 minutes after start)
-        const duringTime = this.adjustTime(tzHours, tzMinutes, 15);
-        const duringExpression = `${duringTime.minutes} ${duringTime.hours} * * *`;
-        
-        // End reminder (at end of duration)
-        const endTime = this.adjustTime(tzHours, tzMinutes, activity.duration);
-        const endExpression = `${endTime.minutes} ${endTime.hours} * * *`;
-        
-        // Follow-up reminder (15 minutes after end)
-        const followUpTime = this.adjustTime(tzHours, tzMinutes, activity.duration + 15);
+        // Follow-up reminder (at end of duration)
+        const followUpTime = this.adjustTime(tzHours, tzMinutes, activity.duration);
         const followUpExpression = `${followUpTime.minutes} ${followUpTime.hours} * * *`;
 
         // Log the scheduled times for debugging
         console.log('Reminder times for activity:', activity.activity, {
           beforeTime: `${beforeTime.hours}:${beforeTime.minutes}`,
           startTime: `${tzHours}:${tzMinutes}`,
-          duringTime: `${duringTime.hours}:${duringTime.minutes}`,
-          endTime: `${endTime.hours}:${endTime.minutes}`,
           followUpTime: `${followUpTime.hours}:${followUpTime.minutes}`
         });
 
@@ -71,8 +73,6 @@ class ReminderService {
           expressions: {
             before: beforeExpression,
             start: startExpression,
-            during: duringExpression,
-            end: endExpression,
             followUp: followUpExpression
           }
         });
@@ -85,20 +85,6 @@ class ReminderService {
         const startJob = cron.schedule(startExpression, async () => {
           await this.sendActivityReminder(user, activity, 'start');
         });
-        
-        const duringJob = cron.schedule(duringExpression, async () => {
-          if (Array.isArray(activity.messages.during)) {
-            for (const message of activity.messages.during) {
-              await evolutionApi.sendText(user.whatsappNumber, message);
-            }
-          } else {
-            await this.sendActivityReminder(user, activity, 'during');
-          }
-        });
-        
-        const endJob = cron.schedule(endExpression, async () => {
-          await this.sendActivityReminder(user, activity, 'end');
-        });
 
         const followUpJob = cron.schedule(followUpExpression, async () => {
           await this.sendActivityReminder(user, activity, 'followUp');
@@ -109,8 +95,6 @@ class ReminderService {
         reminders.push(
           { activityId: activity._id, timing: 'before', job: beforeJob },
           { activityId: activity._id, timing: 'start', job: startJob },
-          { activityId: activity._id, timing: 'during', job: duringJob },
-          { activityId: activity._id, timing: 'end', job: endJob },
           { activityId: activity._id, timing: 'followUp', job: followUpJob }
         );
       });
@@ -158,11 +142,9 @@ class ReminderService {
       } else {
         // Default messages
         const defaultMessages = {
-          before: `⏰ Em 5 minutos: ${activity.activity}`,
-          start: `🎯 Hora de ${activity.activity}`,
-          during: `💪 Continue focado em ${activity.activity}`,
-          end: `✅ Hora de concluir ${activity.activity}`,
-          followUp: `🤔 Como foi ${activity.activity}?`
+          before: `⏰ Prepare-se! Em 5 minutos começa: ${activity.activity}`,
+          start: `🎯 Hora de iniciar: ${activity.activity}`,
+          followUp: `✅ Hora de finalizar: ${activity.activity}\n_Como foi a atividade?_`
         };
         message = defaultMessages[timing];
       }
@@ -195,22 +177,28 @@ class ReminderService {
 
       await evolutionApi.sendList(
         user.whatsappNumber,
-        'Confirmação de Atividade',
-        `Você completou "${activity.activity}"?\n\n` +
-        `${motivationalMessages[activity.type] || motivationalMessages['geral']}`,
+        'Acompanhamento Diário',
+        `Como foi a atividade "${activity.activity}" hoje?\n\n` +
+        `${motivationalMessages[activity.type] || motivationalMessages['geral']}\n\n` +
+        `_Seus lembretes continuarão amanhã no mesmo horário_ ⏰`,
         'Confirmar',
         [{
           title: 'Status da Atividade',
           rows: [
             {
-              title: '✅ Sim, completei!',
+              title: '✅ Completei hoje!',
               description: 'Marcar como concluída',
               rowId: `completed_${activity._id}`
             },
             {
-              title: '❌ Não consegui',
+              title: '❌ Não consegui hoje',
               description: 'Preciso de ajustes',
               rowId: `not_completed_${activity._id}`
+            },
+            {
+              title: '⚙️ Ajustar lembretes',
+              description: 'Modificar frequência ou horários',
+              rowId: `adjust_reminders_${activity._id}`
             }
           ]
         }]

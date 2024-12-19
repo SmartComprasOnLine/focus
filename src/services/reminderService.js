@@ -7,6 +7,92 @@ class ReminderService {
     this.lastSentReminders = new Map(); // userId_activityId_timing -> timestamp
   }
 
+  async getCurrentPlan(user) {
+    try {
+      // Verifica se usuário tem plano atual
+      if (!user.currentPlan?.activities?.length) {
+        await evolutionApi.sendText(
+          user.whatsappNumber,
+          '*Você ainda não tem um plano criado.* 📝\n\n' +
+          '_Que tal me contar um pouco sobre sua rotina para eu criar um plano personalizado?_ 😊'
+        );
+        return null;
+      }
+
+      // Verifica última atualização
+      const lastUpdate = user.currentPlan.lastUpdate;
+      const now = new Date();
+      const hoursSinceUpdate = (now - lastUpdate) / (1000 * 60 * 60);
+
+      // Se o plano foi atualizado há mais de 24 horas, sugere criar novo
+      if (hoursSinceUpdate > 24) {
+        await evolutionApi.sendText(
+          user.whatsappNumber,
+          '*Seu último plano foi criado há mais de 24 horas.* ⏰\n\n' +
+          '_Que tal atualizarmos sua rotina para hoje?_ 😊'
+        );
+        return null;
+      }
+
+      // Formata plano atual para exibição
+      console.log('Formatando plano para exibição:', {
+        userId: user.id,
+        activitiesCount: user.currentPlan.activities.length,
+        lastUpdate: user.currentPlan.lastUpdate
+      });
+
+      const activities = user.currentPlan.activities.reduce((acc, activity) => {
+        const period = this.getPeriod(activity.scheduledTime);
+        if (!acc[period]) {
+          acc[period] = [];
+        }
+        acc[period].push(activity);
+        return acc;
+      }, {});
+
+      // Organiza por período
+      const formattedPlan = {
+        '*🌅 Manhã (até 12:00)*': [],
+        '*🌞 Tarde (12:00-18:00)*': [],
+        '*🌙 Noite (após 18:00)*': []
+      };
+
+      // Preenche atividades por período
+      Object.entries(activities).forEach(([period, acts]) => {
+        acts.sort((a, b) => {
+          const [aHours, aMinutes] = a.scheduledTime.split(':').map(Number);
+          const [bHours, bMinutes] = b.scheduledTime.split(':').map(Number);
+          return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
+        });
+
+        formattedPlan[period] = acts.map(a => 
+          `• *${a.scheduledTime}* _${a.activity}${a.duration ? ` (${a.duration}min)` : ''}_`
+        );
+      });
+
+      // Monta mensagem
+      let message = Object.entries(formattedPlan)
+        .filter(([_, acts]) => acts.length > 0)
+        .map(([period, acts]) => `${period}\n${acts.join('\n')}`)
+        .join('\n\n');
+
+      message += '\n\n_Equilíbrio e produtividade são a chave para um dia bem-sucedido!_ ✨\n\n';
+      message += 'Precisa de algum ajuste? Me avise! 😊';
+
+      return message;
+    } catch (error) {
+      console.error('Erro ao buscar plano atual:', error);
+      throw error;
+    }
+  }
+
+  getPeriod(time) {
+    const [hours] = time.split(':').map(Number);
+    if (hours < 12) return '*🌅 Manhã (até 12:00)*';
+    if (hours < 18) return '*🌞 Tarde (12:00-18:00)*';
+    return '*🌙 Noite (após 18:00)*';
+  }
+
   clearLastSentReminders(userId) {
     // Clear all lastSentReminders for this user
     for (const key of this.lastSentReminders.keys()) {
@@ -61,24 +147,21 @@ class ReminderService {
 
   async setupReminders(user, routine, isUpdate = false) {
     try {
-      // Get existing reminders before canceling
+      console.log('Configurando lembretes para usuário:', {
+        userId: user.id,
+        isUpdate,
+        activitiesCount: routine.activities.length
+      });
+
+      // Verifica se já existe plano
       const existingReminders = this.activeReminders.get(user.id) || [];
+      const hadPreviousPlan = existingReminders.length > 0;
       
-      if (isUpdate) {
-        // Cancel only specific reminders if updating
-        routine.activities.forEach(activity => {
-          const existingActivity = existingReminders.find(r => 
-            r.activityId.toString() === activity._id.toString()
-          );
-          if (existingActivity) {
-            existingActivity.job.stop();
-          }
-        });
-      } else {
-        // Cancel all reminders for new setup
-        this.cancelUserReminders(user.id);
-        
-        // Send setup message only for new setups
+      // Cancela lembretes existentes
+      this.cancelUserReminders(user.id);
+      
+      // Envia mensagem de configuração apenas se necessário
+      if (!hadPreviousPlan && !isUpdate) {
         await evolutionApi.sendText(
           user.whatsappNumber,
           `*Seus lembretes foram configurados!* ⏰\n\n` +
@@ -95,11 +178,28 @@ class ReminderService {
         );
       }
 
-      // Combine existing and new reminders
-      let reminders = isUpdate ? 
-        existingReminders.filter(r => !routine.activities.find(a => 
-          a._id.toString() === r.activityId.toString()
-        )) : [];
+      // Atualiza plano atual
+      const activities = routine.activities.map(activity => ({
+        activity: activity.activity,
+        scheduledTime: activity.scheduledTime,
+        duration: activity.duration,
+        type: activity.type || 'geral',
+        status: 'pending',
+        schedule: {
+          days: activity.schedule?.days || ['*'],
+          repeat: activity.schedule?.repeat || 'daily'
+        }
+      }));
+
+      await user.updateOne({
+        currentPlan: {
+          activities,
+          lastUpdate: new Date()
+        }
+      });
+
+      // Configura novos lembretes
+      const reminders = [];
       
       // Configure reminders for each activity
       console.log(`📅 Iniciando configuração de lembretes para: ${user.name}`);

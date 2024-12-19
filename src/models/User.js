@@ -299,11 +299,36 @@ const userSchema = new mongoose.Schema({
     timezone: {
         type: String,
         required: true,
-        default: 'UTC'
+        default: 'America/Sao_Paulo'
     },
     activeRoutineId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Routine'
+    },
+    currentPlan: {
+        activities: [{
+            activity: String,
+            scheduledTime: String,
+            duration: Number,
+            type: String,
+            status: {
+                type: String,
+                enum: ['pending', 'active', 'completed', 'skipped'],
+                default: 'pending'
+            },
+            schedule: {
+                days: [String],
+                repeat: {
+                    type: String,
+                    enum: ['daily', 'weekdays', 'weekends', 'custom'],
+                    default: 'daily'
+                }
+            }
+        }],
+        lastUpdate: {
+            type: Date,
+            default: Date.now
+        }
     },
     subscription: {
         status: {
